@@ -11,7 +11,13 @@
   "dependencies": {
     "@oclif/core": "^4",
     "@oclif/plugin-help": "^6",
-    "@oclif/plugin-plugins": "^5"
+    "@oclif/plugin-plugins": "^5",
+    "cli-table3": "^0.6.5",
+    "enquirer": "^2.4.1",
+    "level": "^8.0.1",
+    "listr2": "^8.2.1",
+    "otmoic-software-development-kit": "^0.0.6",
+    "puppeteer": "^22.10.0"
   },
   "devDependencies": {
     "@oclif/prettier-config": "^0.2.1",
