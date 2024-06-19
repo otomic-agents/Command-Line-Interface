@@ -28,14 +28,18 @@ export default class GetBridgeActuator {
     run = () => new Promise<TranslatedBridge[] | undefined>(async (resolve, reject) => {
 
         this.fetching = true
+        let taskNow = undefined
         try {
             await new Listr([
                 {
                     title: 'fetch bridge from relay',
                     enabled: true,
                     task: async(_: any, task: any): Promise<void> => {
+                        taskNow = task
                         
                         this.startTask()
+                        
+                        task.output = `fetching...`
 
                         while (this.fetching) {
                             await delay(500)
@@ -53,9 +57,9 @@ export default class GetBridgeActuator {
     })
 
     startTask = () => new Promise<void>(async (resolve, reject) => {
-        const bridges: Bridge[] = await new Relay(this.relayUrl).getBridge()
+        const bridges: Bridge[] = await (await new Relay(this.relayUrl).getBridge()).filter(b => b.src_chain_id == 9006 && b.dst_chain_id == 9006)
 
-        console.log('bridges', bridges)
+        // console.log('bridges', bridges)
         console.log('network', this.network)
         console.log('rpcs', this.rpcs)
         this.translateBridges = await assistive.TranslateBridge(bridges, this.network, this.rpcs)

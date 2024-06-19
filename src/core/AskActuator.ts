@@ -164,7 +164,7 @@ export default class AskActuator {
         const choices = []
         for (const iterator of bridgeInfo) {
             choices.push({
-                name: `${iterator.srcChainName}-${iterator.src_token}(${iterator.srcTokenSymbol})-->${iterator.dstChainName}-${iterator.dst_token}(${iterator.dstTokenSymbol})`,
+                name: `${iterator.srcChainName}---${iterator.src_token}(${iterator.srcTokenSymbol})-->${iterator.dstChainName}---${iterator.dst_token}(${iterator.dstTokenSymbol})`,
                 value: ''
             })
         }
@@ -179,8 +179,8 @@ export default class AskActuator {
         }
 
         const [src, dst] = this.bridgeName.split('-->')
-        const [srcChain, srcToken] = src.split('-')
-        const [dstChain, dstToken] = dst.split('-')
+        const [srcChain, srcToken] = src.split('---')
+        const [dstChain, dstToken] = dst.split('---')
         let choosed : TranslatedBridge | undefined = undefined
         for (const iterator of bridgeInfo) {
             if (srcChain == iterator.srcChainName &&
