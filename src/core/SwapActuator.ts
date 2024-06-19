@@ -125,11 +125,14 @@ export default class SwapActuator {
         if (this.receivingAddress == undefined) {
             throw new Error("receivingAddress is undefined");
         }
+        if (this.privateKeyForSign == undefined) {
+            throw new Error("privateKeyForSign is undefined");
+        }
 
         this.srcRpc = this.rpcs[utils.GetChainName(this.quote.quote_base.bridge.src_chain_id).toLowerCase()]
         this.dstRpc = this.rpcs[utils.GetChainName(this.quote.quote_base.bridge.dst_chain_id).toLowerCase()]
 
-        const signData: {signData: SignData, signed: string} = await evm.signQuoteEIP712ByPrivateKey(this.network, this.quote, process.env.WALLET_KEY as string, this.amount, 0, this.receivingAddress, 
+        const signData: {signData: SignData, signed: string} = await evm.signQuoteEIP712ByPrivateKey(this.network, this.quote, this.privateKeyForSign, this.amount, 0, this.receivingAddress, 
         undefined, this.srcRpc, this.dstRpc)
 
         resolve(signData)
@@ -137,7 +140,7 @@ export default class SwapActuator {
 
     
 
-    run = new Promise<void>(async (resolve, reject) => {
+    run = () => new Promise<string>(async (resolve, reject) => {
         this.quote = await this.askActuator.run()
         
         this.initConfig()
@@ -157,11 +160,24 @@ export default class SwapActuator {
         let business: PreBusiness | undefined = undefined
         let step = 0
 
+        let taskNow : any | undefined = undefined
+        process.on('uncaughtException', (error: Error) => {
+            if (taskNow != undefined) {
+                taskNow.output = error.message
+            }
+        })
+        process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+            if (taskNow != undefined) {
+                taskNow.output = reason
+            }
+        })
+
         try {
             new Listr([{
                 title: 'Sign Quote',
                 enabled: true,
                 task: async(_: any, task: any): Promise<void> => {
+                    taskNow = task
                     task.output = 'signing...'
                     signData = await this.sign()
                     step = 1
@@ -290,7 +306,7 @@ export default class SwapActuator {
                     if (business == undefined) {
                         throw new Error("business is undefined");
                     }
-                    
+
                     while (succeed == false) {
 
                         await delay(500)
@@ -300,10 +316,17 @@ export default class SwapActuator {
                             //get business data and show txhash
                         }
                     }
+
+                    resolve('finished')
                 }
             }]).run()
+
         } catch (error) {
             console.log(error)
+            resolve('exchange failed')
+            return 
         }
+
+        
     })
 }
