@@ -16,7 +16,7 @@
     "enquirer": "^2.4.1",
     "level": "^8.0.1",
     "listr2": "^8.2.1",
-    "otmoic-software-development-kit": "^0.0.9",
+    "otmoic-software-development-kit": "^0.0.10",
     "puppeteer": "^22.10.0"
   },
   "devDependencies": {

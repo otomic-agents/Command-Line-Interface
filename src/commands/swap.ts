@@ -1,5 +1,6 @@
 import {Args, Command, Flags} from '@oclif/core'
 import SwapActuator from '../core/SwapActuator'
+import { delay } from 'listr2'
 
 export default class Swap extends Command {
   static override args = {
@@ -47,6 +48,7 @@ export default class Swap extends Command {
     const resp = await swapActuator.run()
     console.log(resp)
     
+    await delay(500)
     process.exit(0)
   }
 }

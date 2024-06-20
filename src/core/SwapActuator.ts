@@ -67,12 +67,30 @@ export default class SwapActuator {
 
     enterPrivateKeyForSend = () => new Promise<void>(async (resolve, reject) => {
         if (this.privateKeyForSend == undefined) {
-            const pvKeyValue: {value: string} = (await prompt({
-                type: 'input',
+            const keyType: { value: string} = await prompt({
+                type: 'select',
                 name: 'value',
-                message: "please enter your SecToken sender's private key"
-            }))
-            this.privateKeyForSend = pvKeyValue.value
+                message: 'sender key is ?',
+                choices: [{
+                    name: 'same as signer',
+                    value: ''
+                }, {
+                    name: 'enter a new key',
+                    value: ''
+                }]
+            });
+            // console.log('keyType', keyType.value)
+            if (keyType.value == 'same as signer') {
+                this.privateKeyForSend = this.privateKeyForSign
+            } else {
+                const pvKeyValue: {value: string} = (await prompt({
+                    type: 'input',
+                    name: 'value',
+                    message: "please enter your SecToken sender's private key"
+                }))
+                this.privateKeyForSend = pvKeyValue.value
+            }
+
         }
         resolve()
     })
@@ -93,12 +111,35 @@ export default class SwapActuator {
 
     enterAddress = () => new Promise<void>(async (resolve, reject) => {
         if (this.receivingAddress == undefined) {
-            const addressValue: {value: string} = (await prompt({
-                type: 'input',
+            const keyType: { value: string} = await prompt({
+                type: 'select',
                 name: 'value',
-                message: "please enter your wallet address, for receiving DstToken"
-            }))
-            this.receivingAddress = addressValue.value
+                message: 'receiving address is ?',
+                choices: [{
+                    name: 'same as signer',
+                    value: ''
+                }, {
+                    name: 'same as sender',
+                    value: ''
+                }, {
+                    name: 'enter a new address',
+                    value: ''
+                }]
+            });
+
+            if (keyType.value == 'same as signer') {
+                this.receivingAddress = this.getSignerAddress()
+            } else if (keyType.value == 'same as sender') {
+                this.receivingAddress = this.getSenderAddress()
+            } else {
+                const addressValue: {value: string} = (await prompt({
+                    type: 'input',
+                    name: 'value',
+                    message: "please enter your wallet address, for receiving DstToken"
+                }))
+                this.receivingAddress = addressValue.value
+            }
+
         }
 
         if(this.receivingAddress == 'signer') {
@@ -186,6 +227,7 @@ export default class SwapActuator {
                 title: 'Submit Deal',
                 enabled: true,
                 task: async(_: any, task: any): Promise<void> => {
+                    taskNow = task
                     while (step < 1) {   
                         await delay(500)
                     }
@@ -205,7 +247,7 @@ export default class SwapActuator {
                         throw new Error(`lp lock failed: ${JSON.stringify(business)}`);
                     }
 
-                    task.output = `preimage:${business.preimage}, hashlock evm:${business.hashlock_evm}, bidid:${business.hash}`
+                    task.title = `${task.title} -- preimage:${business.preimage}, hashlock evm:${business.hashlock_evm}, bidid:${business.hash}`
 
                     step = 2
                 }
@@ -213,6 +255,7 @@ export default class SwapActuator {
                 title: 'Lock SrcToken (transfer out)',
                 enabled: true,
                 task: async(_: any, task: any): Promise<void> => {
+                    taskNow = task
                     while (step < 2) {   
                         await delay(500)
                     }
@@ -233,7 +276,7 @@ export default class SwapActuator {
 
                     const resp = await evm.transferOutByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc)
 
-                    task.output = resp.transferOut.hash
+                    task.title = `${task.title} -- ${resp.transferOut.hash}`
 
                     step = 3
                 }
@@ -241,6 +284,7 @@ export default class SwapActuator {
                 title: 'Wait lp lock DstToken (transfer in)',
                 enabled: true,
                 task: async(_: any, task: any): Promise<void> => {
+                    taskNow = task
                     while (step < 3) {   
                         await delay(500)
                     }
@@ -269,6 +313,7 @@ export default class SwapActuator {
                 title: 'Release SrcToken (transfer out confirm)',
                 enabled: true,
                 task: async(_: any, task: any): Promise<void> => {
+                    taskNow = task
                     while (step < 4) {   
                         await delay(500)
                     }
@@ -287,7 +332,7 @@ export default class SwapActuator {
 
                     const resp = await evm.transferOutConfirmByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc)
 
-                    task.output = resp.hash
+                    task.title = `${task.title} -- ${resp.hash}`
 
                     step = 5
                 }
@@ -295,6 +340,7 @@ export default class SwapActuator {
                 title: 'Wait lp release DstToken (transfer in confirm)',
                 enabled: true,
                 task: async(_: any, task: any): Promise<void> => {
+                    taskNow = task
                     while (step < 5) {   
                         await delay(500)
                     }

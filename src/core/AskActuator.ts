@@ -1,4 +1,4 @@
-import { Quote, Relay, TranslatedBridge } from 'otmoic-software-development-kit';
+import { Quote, Relay, TranslatedBridge, utils } from 'otmoic-software-development-kit';
 import GetBridgeActuator from './GetBridgeActuator'
 import { prompt } from 'enquirer';
 import { Listr, delay } from 'listr2';
@@ -67,7 +67,7 @@ export default class AskActuator {
               enabled: 'Yes',
               disabled: 'No'
             });
-            console.log('configRpc', configRpc)
+            console.log('configRpc', configRpc.value)
             if (configRpc.value == true) {
               const rpcsValue: string = await prompt({
                 name: 'ConfigRPSC',
@@ -91,7 +91,7 @@ export default class AskActuator {
 
         await this.initRelayUrl()
         await this.initNetwork()
-        await this.initRelayUrl()
+        await this.initChainRpc()
 
         if (this.relayUrl == undefined) {
             throw new Error("know error, relayUrl is undefined");
@@ -104,6 +104,10 @@ export default class AskActuator {
         const bridgeInfo = await getBridge.run()
         if (bridgeInfo == undefined) {
             throw new Error("get bridge info from relay failed");
+        }
+        if (bridgeInfo.length == 0) {
+            console.log('bridge list is empty')
+            return
         }
 
         const choosed = await this.chooseABridge(bridgeInfo)
@@ -125,7 +129,7 @@ export default class AskActuator {
             amount: this.amount
         }, {
             OnQuote: (quote: Quote) => {
-                console.log('t789')
+
                 for (const iterator of quotes) {
                     if (iterator.lp_info.name == quote.lp_info.name) {
                         return
@@ -201,12 +205,18 @@ export default class AskActuator {
     })
 
     chooseAQuote = (quotes: Quote[]) => new Promise<Quote | undefined>(async (resolve, reject) => {
+        
+        if (this.amount == undefined) {
+            throw new Error("amount is undefined");
+        }
+
         const choices = []
         const table = new Table()
         table.push([
             'lp name', 
             'credit score',
             'price', 
+            'estimate',
             'capacity',
             'native token price',
             'native token min',
@@ -214,10 +224,12 @@ export default class AskActuator {
             'need kyc',
             ])
         for (const iterator of quotes) {
+            const {dstAmount, dstNativeAmount} = utils.MathReceived(iterator, this.amount, 0)
             table.push([
                 iterator.lp_info.name, 
                 iterator.lp_info.credit_score,
                 iterator.quote_base.price, 
+                dstAmount,
                 iterator.quote_base.capacity,
                 iterator.quote_base.native_token_price,
                 iterator.quote_base.native_token_min,
@@ -259,6 +271,17 @@ export default class AskActuator {
         this.loading = true
         let times = 5
         
+        let taskNow : any | undefined = undefined
+        process.on('uncaughtException', (error: Error) => {
+            if (taskNow != undefined) {
+                taskNow.output = error.message
+            }
+        })
+        process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+            if (taskNow != undefined) {
+                taskNow.output = reason
+            }
+        })
         await delay(500)
         try {
             await new Listr([
@@ -266,6 +289,7 @@ export default class AskActuator {
                     title: message,
                     enabled: true,
                     task: async(_: any, task: any): Promise<void> => {
+                        taskNow = task
                         
                         while (this.loading) {
                             

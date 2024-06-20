@@ -28,7 +28,20 @@ export default class GetBridgeActuator {
     run = () => new Promise<TranslatedBridge[] | undefined>(async (resolve, reject) => {
 
         this.fetching = true
-        let taskNow = undefined
+        
+
+        let taskNow : any | undefined = undefined
+        process.on('uncaughtException', (error: Error) => {
+            if (taskNow != undefined) {
+                taskNow.output = error.message
+            }
+        })
+        process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+            if (taskNow != undefined) {
+                taskNow.output = reason
+            }
+        })
+
         try {
             await new Listr([
                 {
@@ -57,9 +70,10 @@ export default class GetBridgeActuator {
     })
 
     startTask = () => new Promise<void>(async (resolve, reject) => {
-        const bridges: Bridge[] = await (await new Relay(this.relayUrl).getBridge()).filter(b => b.src_chain_id == 9006 && b.dst_chain_id == 9006)
+        const bridgeList: Bridge[] = await new Relay(this.relayUrl).getBridge()
+        const bridges: Bridge[] = bridgeList.filter(b => b.src_chain_id != 501 && b.dst_chain_id != 501)
 
-        // console.log('bridges', bridges)
+        // console.log('bridgeList', bridgeList)
         console.log('network', this.network)
         console.log('rpcs', this.rpcs)
         this.translateBridges = await assistive.TranslateBridge(bridges, this.network, this.rpcs)
