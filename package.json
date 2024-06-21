@@ -12,11 +12,13 @@
     "@oclif/core": "^4",
     "@oclif/plugin-help": "^6",
     "@oclif/plugin-plugins": "^5",
+    "bignumber.js": "^9.1.2",
     "cli-table3": "^0.6.5",
     "enquirer": "^2.4.1",
     "level": "^8.0.1",
     "listr2": "^8.2.1",
-    "otmoic-software-development-kit": "^0.0.10",
+    "needle": "^3.3.1",
+    "otmoic-software-development-kit": "^0.0.15",
     "puppeteer": "^22.10.0"
   },
   "devDependencies": {
@@ -24,6 +26,7 @@
     "@oclif/test": "^4",
     "@types/chai": "^4",
     "@types/mocha": "^10",
+    "@types/needle": "^3.3.0",
     "@types/node": "^18",
     "chai": "^4",
     "eslint": "^8",

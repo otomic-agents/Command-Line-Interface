@@ -2,7 +2,7 @@ import { Listr, delay } from "listr2"
 import AskActuator from "./AskActuator"
 import { prompt } from 'enquirer';
 import { ethers } from "ethers";
-import { PreBusiness, Quote, Relay, SignData, evm, utils } from "otmoic-software-development-kit";
+import { PreBusiness, Quote, Relay, SignData, business as Business, evm, utils } from "otmoic-software-development-kit";
 
 export default class SwapActuator {
 
@@ -173,7 +173,7 @@ export default class SwapActuator {
         this.srcRpc = this.rpcs[utils.GetChainName(this.quote.quote_base.bridge.src_chain_id).toLowerCase()]
         this.dstRpc = this.rpcs[utils.GetChainName(this.quote.quote_base.bridge.dst_chain_id).toLowerCase()]
 
-        const signData: {signData: SignData, signed: string} = await evm.signQuoteEIP712ByPrivateKey(this.network, this.quote, this.privateKeyForSign, this.amount, 0, this.receivingAddress, 
+        const signData: {signData: SignData, signed: string} = await Business.signQuoteByPrivateKey(this.network, this.quote, this.privateKeyForSign, this.amount, 0, this.receivingAddress, 
         undefined, this.srcRpc, this.dstRpc)
 
         resolve(signData)
@@ -227,10 +227,11 @@ export default class SwapActuator {
                 title: 'Submit Deal',
                 enabled: true,
                 task: async(_: any, task: any): Promise<void> => {
-                    taskNow = task
+                    
                     while (step < 1) {   
                         await delay(500)
                     }
+                    taskNow = task
 
                     task.output = 'submitting...'
                     
@@ -255,10 +256,11 @@ export default class SwapActuator {
                 title: 'Lock SrcToken (transfer out)',
                 enabled: true,
                 task: async(_: any, task: any): Promise<void> => {
-                    taskNow = task
+                    
                     while (step < 2) {   
                         await delay(500)
                     }
+                    taskNow = task
                     
                     task.output = 'sending...'
 
@@ -274,7 +276,7 @@ export default class SwapActuator {
                         throw new Error("network is undefined");
                     }
 
-                    const resp = await evm.transferOutByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc)
+                    const resp = await Business.transferOutByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc)
 
                     task.title = `${task.title} -- ${resp.transferOut.hash}`
 
@@ -284,10 +286,11 @@ export default class SwapActuator {
                 title: 'Wait lp lock DstToken (transfer in)',
                 enabled: true,
                 task: async(_: any, task: any): Promise<void> => {
-                    taskNow = task
+                    
                     while (step < 3) {   
                         await delay(500)
                     }
+                    taskNow = task
 
                     task.output = 'waiting...'
 
@@ -313,10 +316,11 @@ export default class SwapActuator {
                 title: 'Release SrcToken (transfer out confirm)',
                 enabled: true,
                 task: async(_: any, task: any): Promise<void> => {
-                    taskNow = task
+                    
                     while (step < 4) {   
                         await delay(500)
                     }
+                    taskNow = task
                     
                     task.output = 'sending...'
 
@@ -330,7 +334,7 @@ export default class SwapActuator {
                         throw new Error("network is undefined");
                     }
 
-                    const resp = await evm.transferOutConfirmByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc)
+                    const resp = await Business.transferOutConfirmByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc)
 
                     task.title = `${task.title} -- ${resp.hash}`
 
@@ -340,10 +344,11 @@ export default class SwapActuator {
                 title: 'Wait lp release DstToken (transfer in confirm)',
                 enabled: true,
                 task: async(_: any, task: any): Promise<void> => {
-                    taskNow = task
+                    
                     while (step < 5) {   
                         await delay(500)
                     }
+                    taskNow = task
 
                     task.output = 'waiting...'
 
@@ -357,7 +362,7 @@ export default class SwapActuator {
 
                         await delay(500)
                         const resp = await relay.getBusiness(business.hash)
-                        succeed = resp.step >= 3
+                        succeed = resp.step >= 5
                         if (succeed) {
                             //get business data and show txhash
                         }

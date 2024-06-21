@@ -24,6 +24,14 @@ export default class Monkey extends Command {
     privateKey: Flags.string({char: 'p', description: ''}),
 
     webhook: Flags.string({char: 'w', description: ''}),
+
+    type: Flags.string({char: 't', description: ''}),
+
+    lp: Flags.string({char: 'l', description: ''}),
+
+    network: Flags.string({char: 'n', description: 'network: main / test'}),
+
+    chainRpc: Flags.string({char: 'c', description: 'rpc config json, like: { bsc: "<RPC_BSC>" }'}),
   }
 
   public async run(): Promise<void> {
@@ -35,8 +43,12 @@ export default class Monkey extends Command {
     let bridge = flags.bridge
     let privateKey = flags.privateKey
     let webhook = flags.webhook
+    let type = flags.type
+    let lp = flags.lp
+    let network = flags.network
+    let chainRpc = flags.chainRpc
 
-    let monkeyActuator = new MonkeyActuator(interval, relay, amount, bridge, privateKey, webhook)
+    let monkeyActuator = new MonkeyActuator(interval, relay, amount, bridge, privateKey, webhook, type, lp, network, chainRpc)
     monkeyActuator.run()
 
 
