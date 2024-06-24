@@ -1,7 +1,7 @@
 {
   "name": "otmoiccli",
   "description": "otmoic-cli has functions such as generating account reports, querying quotes, and making exchanges.",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "author": "bytetrade",
   "bin": {
     "otmoiccli": "./bin/run.js",
@@ -11,7 +11,6 @@
   "dependencies": {
     "@oclif/core": "^4",
     "@oclif/plugin-help": "^6",
-    "@oclif/plugin-plugins": "^5",
     "bignumber.js": "^9.1.2",
     "cli-table3": "^0.6.5",
     "enquirer": "^2.4.1",
@@ -59,8 +58,7 @@
     "dirname": "otmoiccli",
     "topicSeparator": " ",
     "plugins": [
-      "@oclif/plugin-help",
-      "@oclif/plugin-plugins"
+      "@oclif/plugin-help"
     ],
     "topics": {
       "hello": {

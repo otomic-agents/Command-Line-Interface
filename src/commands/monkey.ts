@@ -3,7 +3,6 @@ import MonkeyActuator from '../core/MonkeyActuator'
 
 export default class Monkey extends Command {
   static override args = {
-    file: Args.string({description: 'file to read'}),
   }
 
   static override description = 'describe the command here'
@@ -13,21 +12,21 @@ export default class Monkey extends Command {
   ]
 
   static override flags = {
-    interval: Flags.string({char: 'i', description: ''}),
+    interval: Flags.string({char: 'i', description: "the interval between the two monkeys' departures is random within a certain range, in the format of [min]-[max]"}),
 
-    relay: Flags.string({char: 'r', description: ''}),
+    relay: Flags.string({char: 'r', description: 'relay url'}),
 
-    amount: Flags.string({char: 'a', description: ''}),
+    amount: Flags.string({char: 'a', description: 'the percentage of srctokens exchanged (base of balance) in each test, random within a specific range, in the format of [min]-[max]'}),
 
-    bridge: Flags.string({char: 'b', description: ''}),
+    bridge: Flags.string({char: 'b', description: 'the bridges to be tested are separated by commas. If it is empty, there is no limit.'}),
 
-    privateKey: Flags.string({char: 'p', description: ''}),
+    privateKey: Flags.string({char: 'p', description: 'wallet private key used during testing'}),
 
-    webhook: Flags.string({char: 'w', description: ''}),
+    webhook: Flags.string({char: 'w', description: 'webhook address for receiving execution reports'}),
 
-    type: Flags.string({char: 't', description: ''}),
+    type: Flags.string({char: 't', description: 'the test type, separated by commas, [succeed] or [refund]'}),
 
-    lp: Flags.string({char: 'l', description: ''}),
+    lp: Flags.string({char: 'l', description: 'the lp name to be tested. no restriction if empty.'}),
 
     network: Flags.string({char: 'n', description: 'network: main / test'}),
 

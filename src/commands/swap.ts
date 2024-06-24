@@ -4,7 +4,6 @@ import { delay } from 'listr2'
 
 export default class Swap extends Command {
   static override args = {
-    file: Args.string({description: 'file to read'}),
   }
 
   static override description = 'exchange token'
