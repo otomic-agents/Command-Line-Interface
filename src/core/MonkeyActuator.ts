@@ -1,7 +1,7 @@
 import { prompt } from 'enquirer';
 import { ethers } from "ethers";
 import { Listr, delay } from 'listr2';
-import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, business as Business } from 'otmoic-software-development-kit';
+import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, business as Business, ResponseTransferOut, ResponseSolana } from 'otmoic-software-development-kit';
 import Bignumber from 'Bignumber.js'
 import needle from 'needle'
 import { title } from 'process';
@@ -620,11 +620,11 @@ export default class MonkeyActuator {
         const resp = await Business.transferOutByPrivateKey(dealInfo.business, this.config.privateKey, 
             this.config.network, dealInfo.srcRpc)
 
-        if (utils.getChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
-            task.title = `${task.title} -- ${resp.transferOut.hash}`
-        } else if (utils.getChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-            task.title = `${task.title} -- ${resp.txHash}`
-            this.solanaUuid = resp.uuid
+        if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+            task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
+        } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
+            task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+            this.solanaUuid = (resp as ResponseSolana).uuid
         }
 
         await delay(50)
@@ -660,12 +660,12 @@ export default class MonkeyActuator {
             throw new Error("business is undefined");
         }
 
-        if (utils.getChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+        if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
             const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
-            task.title = `${task.title} -- ${resp.hash}`
-        } else if (utils.getChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
+            task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
+        } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
             const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, this.solanaUuid!)
-            task.title = `${task.title} -- ${resp.txHash}`
+            task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
         }
         
         await delay(50)
@@ -714,12 +714,12 @@ export default class MonkeyActuator {
             task.output = `can refund: ${canDo}, now: ${Date.now()}, time lock: ${(dealInfo.business.swap_asset_information.agreement_reached_time + dealInfo.business.swap_asset_information.step_time_lock * 7) * 1000}`
         }
 
-        if (utils.getChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+        if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
             const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
-            task.title = `${task.title} -- ${resp.hash}`
-        } else if (utils.getChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
+            task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
+        } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
             const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, this.solanaUuid!)
-            task.title = `${task.title} -- ${resp.txHash}`
+            task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
         }
 
         await delay(50)

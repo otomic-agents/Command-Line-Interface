@@ -2,7 +2,7 @@ import { Listr, delay } from "listr2"
 import AskActuator from "./AskActuator"
 import { prompt } from 'enquirer';
 import { ethers } from "ethers";
-import { PreBusiness, Quote, Relay, SignData, business as Business, evm, utils } from "otmoic-software-development-kit";
+import { PreBusiness, Quote, Relay, SignData, business as Business, evm, utils, ResponseSolana, ResponseTransferOut } from "otmoic-software-development-kit";
 
 export default class SwapActuator {
 
@@ -279,11 +279,11 @@ export default class SwapActuator {
                     }
 
                     const resp = await Business.transferOutByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc)
-                    if (utils.getChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
-                        task.title = `${task.title} -- ${resp.transferOut.hash}`
-                    } else if (utils.getChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-                        task.title = `${task.title} -- ${resp.txHash}`
-                        this.solanaUuid = resp.uuid
+                    if (utils.GetChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+                        task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
+                    } else if (utils.GetChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
+                        task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+                        this.solanaUuid = (resp as ResponseSolana).uuid
                     }
 
                     step = 3
@@ -340,12 +340,12 @@ export default class SwapActuator {
                         throw new Error("network is undefined");
                     }
 
-                    if (utils.getChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+                    if (utils.GetChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
                         const resp = await Business.transferOutConfirmByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc)
-                        task.title = `${task.title} -- ${resp.hash}`
-                    } else if (utils.getChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
+                        task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
+                    } else if (utils.GetChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
                         const resp = await Business.transferOutConfirmByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc, this.solanaUuid!)
-                        task.title = `${task.title} -- ${resp.hash}`
+                        task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
                     }
 
                     step = 5
