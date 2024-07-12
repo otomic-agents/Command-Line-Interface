@@ -24,7 +24,9 @@ export default class Monkey extends Command {
 
     webhook: Flags.string({char: 'w', description: 'webhook address for receiving execution reports'}),
 
-    type: Flags.string({char: 't', description: 'the test type, separated by commas, [succeed] or [refund]'}),
+    type: Flags.string({char: 't', description: 'the test type, separated by commas, [succeed] or [refund] or [cheat amount] or [cheat address] or [cheat txin]'}),
+
+    complaint: Flags.string({char: 'C', description: 'do complaint, enter [true] or [false], if "type" is not "succeed", complaint can be run'}),
 
     lp: Flags.string({char: 'l', description: 'the lp name to be tested. no restriction if empty.'}),
 
@@ -43,11 +45,12 @@ export default class Monkey extends Command {
     let privateKey = flags.privateKey
     let webhook = flags.webhook
     let type = flags.type
+    let complaint = flags.complaint
     let lp = flags.lp
     let network = flags.network
     let chainRpc = flags.chainRpc
 
-    let monkeyActuator = new MonkeyActuator(interval, relay, amount, bridge, privateKey, webhook, type, lp, network, chainRpc)
+    let monkeyActuator = new MonkeyActuator(interval, relay, amount, bridge, privateKey, webhook, type, complaint, lp, network, chainRpc)
     monkeyActuator.run()
 
 

@@ -4,6 +4,7 @@ import { Listr, delay } from 'listr2';
 import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, business as Business } from 'otmoic-software-development-kit';
 import Bignumber from 'Bignumber.js'
 import needle from 'needle'
+import { title } from 'process';
 
 function getRandomNumberInRange(n: number, m: number): number {
     return Math.floor(Math.random() * (m - n + 1) + n);
@@ -35,6 +36,8 @@ interface Config {
 
     type: string[]
 
+    complaint: string[]
+
     lp: string
 
     network: string
@@ -47,6 +50,8 @@ interface DealInfo {
     amount: string | undefined
 
     type: string | undefined
+
+    complaint: boolean | undefined
 
     quote: Quote | undefined
 
@@ -78,6 +83,8 @@ export default class MonkeyActuator {
 
     type: string | undefined
 
+    complaint: string | undefined
+
     lp: string | undefined
 
     network: string | undefined
@@ -99,6 +106,7 @@ export default class MonkeyActuator {
         receivingAddress: '',
         webhook: '',
         type: [],
+        complaint: [],
         lp: '',
         network: '',
         rpcs: {}
@@ -106,8 +114,8 @@ export default class MonkeyActuator {
 
     constructor(interval: string | undefined, relay: string | undefined, amount: string | undefined, 
         bridge: string | undefined, privateKey: string | undefined, webhook: string | undefined, 
-        type: string | undefined, lp: string | undefined, network: string | undefined,
-        rpcs: string | undefined) {
+        type: string | undefined, complaint: string | undefined, lp: string | undefined, 
+        network: string | undefined, rpcs: string | undefined) {
 
         this.interval = interval
         this.relay = relay
@@ -116,6 +124,7 @@ export default class MonkeyActuator {
         this.privateKey = privateKey
         this.webhook = webhook
         this.type = type
+        this.complaint = complaint
         this.lp = lp
         this.network = network
         this.rpcs = rpcs == undefined ? {} : JSON.parse(rpcs)
@@ -167,6 +176,7 @@ export default class MonkeyActuator {
         const dealInfo: DealInfo = {
             bridge: undefined,
             amount: undefined,
+            complaint: undefined,
             type: undefined,
             quote: undefined,
             business: undefined,
@@ -306,7 +316,22 @@ export default class MonkeyActuator {
                                                 await delay(100)
                                             }
                                         } else {
-                                            task.title = `${task.title} -- type ${dealInfo.type} skip this task`
+
+                                            if (dealInfo.type == 'cheat txin') {
+                                                taskNow = task
+        
+                                                let finished = false
+                                                this.cheatExchangeTxInCfm(task, dealInfo)
+                                                    .then(() => finished = true)
+                
+                                                while (finished == false) {
+                                                    await delay(100)
+                                                }
+                                            } else {
+                                                task.title = `${task.title} -- type ${dealInfo.type} skip this task`
+                                            }
+
+                                            
                                         }
                                         
                                         
@@ -338,7 +363,7 @@ export default class MonkeyActuator {
                                     title: 'tx out refund',
                                     enable: true,
                                     task: async(_: any, task: any): Promise<void> => {
-                                        if (dealInfo.type == 'refund') {
+                                        if (dealInfo.type != 'succeed') {
                                             
                                             taskNow = task
         
@@ -358,7 +383,7 @@ export default class MonkeyActuator {
                                     title: 'tx in refund',
                                     enable: true,
                                     task: async(_: any, task: any): Promise<void> => {
-                                        if (dealInfo.type == 'refund') {
+                                        if (dealInfo.type != 'succeed') {
                                             taskNow = task
                                             
                                             let finished = false
@@ -372,11 +397,27 @@ export default class MonkeyActuator {
                                             task.title = `${task.title} -- type ${dealInfo.type} skip this task`
                                         }
         
-                                        this.callWebHookSucceed(task, relay, dealInfo)
-        
-                                        this.taskList = undefined
                                     }
                                 },
+                                {
+                                    title: 'complaint',
+                                    enable: true,
+                                    task: async(_: any, task: any): Promise<void> => {
+                                        taskNow = task
+
+                                        if (dealInfo.type?.startsWith('cheat')) {
+
+                                            if (dealInfo.complaint == true) {
+
+                                                await this.taskExchangeComplaint(dealInfo)
+                                            }
+                                        }
+
+                                        this.callWebHookSucceed(task, relay, dealInfo)
+
+                                        this.taskList = undefined
+                                    }
+                                }
                             ], {
                                 rendererOptions: { collapseSubtasks: false },
                                 exitOnError: true,
@@ -483,6 +524,7 @@ export default class MonkeyActuator {
         dealInfo.amount = balance.times(getRandomNumberInRange(this.config.amountMin, this.config.amountMax)).div(100).toFixed(8)
 
         dealInfo.type = this.config.type[getRandomNumberInRange(0, this.config.type.length - 1)]
+        dealInfo.complaint = 'true' == this.config.complaint[getRandomNumberInRange(0, this.config.complaint.length - 1)]
 
         task.title = `${task.title} --- (amount:${dealInfo.amount}) --- (type:${dealInfo.type})`
 
@@ -563,6 +605,16 @@ export default class MonkeyActuator {
             throw new Error("business is undefined");
         }
 
+        if(dealInfo.type == 'cheat amount') {
+            const dArr = dealInfo.business.swap_asset_information.amount.split('.')
+            const d = dArr.length == 2 ? [dArr].length : 0
+            dealInfo.business.swap_asset_information.amount = new Bignumber(dealInfo.business.swap_asset_information.amount).times(0.8).toFixed(d)
+        }
+
+        if (dealInfo.type == 'cheat address') {
+            dealInfo.business.swap_asset_information.quote.quote_base.lp_bridge_address = dealInfo.business.swap_asset_information.sender
+        }
+
         const resp = await Business.transferOutByPrivateKey(dealInfo.business, this.config.privateKey, 
             this.config.network, dealInfo.srcRpc)
 
@@ -606,6 +658,11 @@ export default class MonkeyActuator {
         task.title = `${task.title} -- ${resp.hash}`
         await delay(50)
 
+        resolve()
+    })
+
+    cheatExchangeTxInCfm = (task: any, dealInfo: DealInfo) => new Promise<void>((resolve, reject) => {
+        // TODO FIXME
         resolve()
     })
 
@@ -672,6 +729,11 @@ export default class MonkeyActuator {
                 //get business data and show txhash
             }
         }
+        resolve()
+    })
+
+    taskExchangeComplaint = (dealInfo: DealInfo) => new Promise<void>((resolve, reject) => {
+        // TODO FIXME otmoic
         resolve()
     })
 
@@ -851,7 +913,10 @@ export default class MonkeyActuator {
                 message: 'Select the deal status you want to test.',
                 choices: [
                     { name: 'succeed', value: 'succeed'},
-                    { name: 'refund', value: 'refund'}
+                    { name: 'refund', value: 'refund'},
+                    { name: 'cheat amount', value: 'cheat amount'},
+                    { name: 'cheat address', value: 'cheat address'},
+                    { name: 'cheat txin', value: 'cheat txin'}
                 ]
             })
             this.config.type = typeValue.value
@@ -860,11 +925,29 @@ export default class MonkeyActuator {
         }
 
         for (const iterator of this.config.type) {
-            if(iterator != 'succeed' && iterator != 'refund') {
+            if(iterator != 'succeed' && iterator != 'refund' && iterator != 'cheat amount' 
+                && iterator != 'cheat address' && iterator != 'cheat txin'
+            ) {
                 throw new Error(`unknow type: ${iterator}`);
             }
         }
         console.log(`type:`, this.config.type)
+
+        if (this.complaint == undefined) {
+            const complaintValue: {value: string[]} = await prompt({
+                type: 'multiselect',
+                name: 'value',
+                message: 'Select the deal complaint you want to test.',
+                choices: [
+                    { name: 'true', value: 'true'},
+                    { name: 'false', value: 'false'}
+                ]
+            })
+            this.config.complaint = complaintValue.value 
+        } else {
+            this.config.complaint = this.complaint.split(',')
+        }
+        console.log(`complaint:`, this.config.complaint)
 
         resolve()
     })
