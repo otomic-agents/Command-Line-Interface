@@ -65,6 +65,8 @@ interface DealInfo {
         signData: SignData, 
         signed: string
     } | undefined
+
+    uuid: string | undefined
 }
 
 export default class MonkeyActuator {
@@ -94,8 +96,6 @@ export default class MonkeyActuator {
     } = {}
 
     taskList: Listr | undefined
-
-    solanaUuid: string | undefined
 
     config: Config = {
         intervalMin: 0,
@@ -184,7 +184,8 @@ export default class MonkeyActuator {
             business: undefined,
             srcRpc: undefined,
             dstRpc: undefined,
-            signData: undefined
+            signData: undefined,
+            uuid: undefined
         }
 
         try {
@@ -624,7 +625,7 @@ export default class MonkeyActuator {
             task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
             task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
-            this.solanaUuid = (resp as ResponseSolana).uuid
+            dealInfo.uuid = (resp as ResponseSolana).uuid
         }
 
         await delay(50)
@@ -664,7 +665,7 @@ export default class MonkeyActuator {
             const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
             task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-            const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, this.solanaUuid!)
+            const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, dealInfo.uuid!)
             task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
         }
         
@@ -718,7 +719,7 @@ export default class MonkeyActuator {
             const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
             task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-            const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, this.solanaUuid!)
+            const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, dealInfo.uuid!)
             task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
         }
 
