@@ -95,6 +95,8 @@ export default class MonkeyActuator {
 
     taskList: Listr | undefined
 
+    solanaUuid: string | undefined
+
     config: Config = {
         intervalMin: 0,
         intervalMax: 0,
@@ -618,7 +620,12 @@ export default class MonkeyActuator {
         const resp = await Business.transferOutByPrivateKey(dealInfo.business, this.config.privateKey, 
             this.config.network, dealInfo.srcRpc)
 
-        task.title = `${task.title} -- ${resp.transferOut.hash}`
+        if (utils.getChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+            task.title = `${task.title} -- ${resp.transferOut.hash}`
+        } else if (utils.getChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
+            task.title = `${task.title} -- ${resp.txHash}`
+            this.solanaUuid = resp.uuid
+        }
 
         await delay(50)
         resolve()
@@ -653,11 +660,15 @@ export default class MonkeyActuator {
             throw new Error("business is undefined");
         }
 
-        const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
-
-        task.title = `${task.title} -- ${resp.hash}`
+        if (utils.getChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+            const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
+            task.title = `${task.title} -- ${resp.hash}`
+        } else if (utils.getChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
+            const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, this.solanaUuid!)
+            task.title = `${task.title} -- ${resp.txHash}`
+        }
+        
         await delay(50)
-
         resolve()
     })
 
@@ -703,9 +714,14 @@ export default class MonkeyActuator {
             task.output = `can refund: ${canDo}, now: ${Date.now()}, time lock: ${(dealInfo.business.swap_asset_information.agreement_reached_time + dealInfo.business.swap_asset_information.step_time_lock * 7) * 1000}`
         }
 
-        const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
+        if (utils.getChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+            const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
+            task.title = `${task.title} -- ${resp.hash}`
+        } else if (utils.getChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
+            const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, this.solanaUuid!)
+            task.title = `${task.title} -- ${resp.txHash}`
+        }
 
-        task.title = `${task.title} -- ${resp.hash}`
         await delay(50)
 
         resolve()

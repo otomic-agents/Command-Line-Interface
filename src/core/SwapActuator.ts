@@ -34,6 +34,8 @@ export default class SwapActuator {
 
     dstRpc: string | undefined
 
+    solanaUuid: string | undefined
+
     constructor (relayUrl: string | undefined, network: string | undefined, rpcs: string | undefined, 
         bridgeName: string | undefined, amount: string | undefined, privateKeyForSign: string | undefined,
         privateKeyForSend: string | undefined, receivingAddress: string | undefined) {
@@ -277,8 +279,12 @@ export default class SwapActuator {
                     }
 
                     const resp = await Business.transferOutByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc)
-
-                    task.title = `${task.title} -- ${resp.transferOut.hash}`
+                    if (utils.getChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+                        task.title = `${task.title} -- ${resp.transferOut.hash}`
+                    } else if (utils.getChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
+                        task.title = `${task.title} -- ${resp.txHash}`
+                        this.solanaUuid = resp.uuid
+                    }
 
                     step = 3
                 }
@@ -334,9 +340,13 @@ export default class SwapActuator {
                         throw new Error("network is undefined");
                     }
 
-                    const resp = await Business.transferOutConfirmByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc)
-
-                    task.title = `${task.title} -- ${resp.hash}`
+                    if (utils.getChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+                        const resp = await Business.transferOutConfirmByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc)
+                        task.title = `${task.title} -- ${resp.hash}`
+                    } else if (utils.getChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
+                        const resp = await Business.transferOutConfirmByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc, this.solanaUuid!)
+                        task.title = `${task.title} -- ${resp.hash}`
+                    }
 
                     step = 5
                 }
