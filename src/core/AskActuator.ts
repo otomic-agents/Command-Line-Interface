@@ -69,7 +69,7 @@ export default class AskActuator {
             });
             console.log('configRpc', configRpc.value)
             if (configRpc.value == true) {
-              const rpcsValue: string = await prompt({
+              const rpcsValue: any = await prompt({
                 name: 'ConfigRPSC',
                 type: 'snippet',
                 message: 'enter your rpc url',
@@ -81,7 +81,10 @@ export default class AskActuator {
               })
       
               console.log('rpcsValue', rpcsValue)
-              this.rpcs = JSON.parse(rpcsValue)
+              this.rpcs = {
+                bsc: rpcsValue.ConfigRPSC.values.bsc_rpc_url,
+                opt: rpcsValue.ConfigRPSC.values.opt_rpc_url
+              }
             }
       
         }
