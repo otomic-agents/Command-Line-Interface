@@ -71,12 +71,12 @@ export default class GetBridgeActuator {
 
     startTask = () => new Promise<void>(async (resolve, reject) => {
         const bridgeList: Bridge[] = await new Relay(this.relayUrl).getBridge()
-        const bridges: Bridge[] = bridgeList.filter(b => b.src_chain_id != 501 && b.dst_chain_id != 501)
+        // const bridges: Bridge[] = bridgeList.filter(b => b.src_chain_id != 501 && b.dst_chain_id != 501)
 
         // console.log('bridgeList', bridgeList)
         console.log('network', this.network)
         console.log('rpcs', this.rpcs)
-        this.translateBridges = await assistive.TranslateBridge(bridges, this.network, this.rpcs)
+        this.translateBridges = await assistive.TranslateBridge(bridgeList, this.network, this.rpcs)
 
         const table = new Table()
         

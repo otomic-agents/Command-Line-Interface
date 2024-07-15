@@ -490,7 +490,8 @@ export default class MonkeyActuator {
                     }
                 }
             }
-        }).filter(b => (b.src_chain_id != 501 && b.dst_chain_id != 501))
+        })
+        // .filter(b => (b.src_chain_id != 501 && b.dst_chain_id != 501))
 
         task.output = `bridge size: ${bridgeList.length}, check token balance`
 
