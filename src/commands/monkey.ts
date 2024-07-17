@@ -33,6 +33,8 @@ export default class Monkey extends Command {
     network: Flags.string({char: 'n', description: 'network: main / test'}),
 
     chainRpc: Flags.string({char: 'c', description: 'rpc config json, like: { bsc: "<RPC_BSC>" }'}),
+
+    to: Flags.string({char: 'T', description: 'your wallet address for receiving token'}),
   }
 
   public async run(): Promise<void> {
@@ -49,8 +51,9 @@ export default class Monkey extends Command {
     let lp = flags.lp
     let network = flags.network
     let chainRpc = flags.chainRpc
+    let receivingAddress = flags.to
 
-    let monkeyActuator = new MonkeyActuator(interval, relay, amount, bridge, privateKey, webhook, type, complaint, lp, network, chainRpc)
+    let monkeyActuator = new MonkeyActuator(interval, relay, amount, bridge, privateKey, webhook, type, complaint, lp, network, chainRpc, receivingAddress)
     monkeyActuator.run()
 
 

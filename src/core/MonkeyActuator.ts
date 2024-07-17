@@ -30,6 +30,8 @@ interface Config {
 
     privateKey: string
 
+    sendingAddress: string
+
     receivingAddress: string
 
     webhook: string
@@ -95,6 +97,8 @@ export default class MonkeyActuator {
         [key: string]: string
     } = {}
 
+    receivingAddress: string | undefined
+
     taskList: Listr | undefined
 
     config: Config = {
@@ -105,6 +109,7 @@ export default class MonkeyActuator {
         amountMax: 0,
         bridges: [],
         privateKey: '',
+        sendingAddress: '',
         receivingAddress: '',
         webhook: '',
         type: [],
@@ -117,7 +122,7 @@ export default class MonkeyActuator {
     constructor(interval: string | undefined, relay: string | undefined, amount: string | undefined, 
         bridge: string | undefined, privateKey: string | undefined, webhook: string | undefined, 
         type: string | undefined, complaint: string | undefined, lp: string | undefined, 
-        network: string | undefined, rpcs: string | undefined) {
+        network: string | undefined, rpcs: string | undefined, receivingAddress: string | undefined) {
 
         this.interval = interval
         this.relay = relay
@@ -130,6 +135,7 @@ export default class MonkeyActuator {
         this.lp = lp
         this.network = network
         this.rpcs = rpcs == undefined ? {} : JSON.parse(rpcs)
+        this.receivingAddress = receivingAddress
     }
 
     run = () => new Promise<void>(async (resolve, reject) => {
@@ -141,6 +147,7 @@ export default class MonkeyActuator {
         await this.initAmount()
         await this.initBridge()
         await this.initPrivateKey()
+        await this.initReceivingAddress()
         await this.initWebhook()
         await this.initType()
         await this.initLP()
@@ -646,6 +653,7 @@ export default class MonkeyActuator {
 
             await delay(500)
             const resp = await relay.getBusiness(dealInfo.business.hash)
+            task.output = `waiting... step: ${resp.step}`
             succeed = resp.step >= 3
             if (succeed) {
                 //get business data and show txhash
@@ -692,6 +700,7 @@ export default class MonkeyActuator {
 
             await delay(500)
             const resp = await relay.getBusiness(dealInfo.business.hash)
+            task.output = `waiting... step: ${resp.step}`
             succeed = resp.step >= 5
             if (succeed) {
                 //get business data and show txhash
@@ -742,6 +751,7 @@ export default class MonkeyActuator {
 
             await delay(500)
             const resp = await relay.getBusiness(dealInfo.business.hash)
+            task.output = `waiting... step: ${resp.step}`
             succeed = resp.step >= 7
             if (succeed) {
                 //get business data and show txhash
@@ -907,9 +917,39 @@ export default class MonkeyActuator {
         this.config.privateKey = this.privateKey
 
         const wallet = new ethers.Wallet(this.config.privateKey)
-        this.config.receivingAddress = wallet.address
+        this.config.sendingAddress = wallet.address
 
         console.log(`test wallet is: ${wallet.address}`)
+        resolve()
+    })
+
+    initReceivingAddress = () => new Promise<void>(async (resolve, reject) => {
+        if (this.receivingAddress == undefined) {
+            const keyType: { value: string} = await prompt({
+                type: 'select',
+                name: 'value',
+                message: 'receiving address is ?',
+                choices: [{
+                    name: 'same as test address',
+                    value: ''
+                }, {
+                    name: 'enter a new address',
+                    value: ''
+                }]
+            });
+
+            if (keyType.value == 'same as test address') {
+                this.receivingAddress = this.config.sendingAddress
+            } else {
+                const addressValue: {value: string} = (await prompt({
+                    type: 'input',
+                    name: 'value',
+                    message: "please enter your wallet address, for receiving DstToken"
+                }))
+                this.receivingAddress = addressValue.value
+            }
+        }
+        this.config.receivingAddress = this.receivingAddress
         resolve()
     })
 
@@ -994,7 +1034,7 @@ export default class MonkeyActuator {
 
     isBalanceEnough = (bridge: Bridge) => new Promise<boolean>(async (resolve, reject) => {
         
-        const balance = await assistive.GetBalance(bridge, this.config.receivingAddress, this.config.network, 
+        const balance = await assistive.GetBalance(bridge, this.config.sendingAddress, this.config.network, 
             this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()])
         if (parseFloat(balance) > 0) {
             resolve(true)
@@ -1004,7 +1044,7 @@ export default class MonkeyActuator {
     })
 
     getBalance = (bridge: Bridge) => new Promise<Bignumber>(async (resolve, reject) => {
-        const balance = await assistive.GetBalance(bridge, this.config.receivingAddress, this.config.network, 
+        const balance = await assistive.GetBalance(bridge, this.config.sendingAddress, this.config.network, 
             this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()])
         resolve(new Bignumber(balance))
     })
