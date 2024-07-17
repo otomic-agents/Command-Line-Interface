@@ -246,6 +246,9 @@ export default class SwapActuator {
                     
                     business = await relay.swap(this.quote, signData.signData, signData.signed)
 
+                    if (!business) {
+                        throw new Error(`failed to get business from relay: ${JSON.stringify(business)}`);
+                    }
                     if (business.locked == false) {
                         throw new Error(`lp lock failed: ${JSON.stringify(business)}`);
                     }

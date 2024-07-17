@@ -31,41 +31,41 @@ export default class GetBridgeActuator {
         
 
         let taskNow : any | undefined = undefined
-        process.on('uncaughtException', (error: Error) => {
+        const uncaughtExceptionListener = (error: Error) => {
             if (taskNow != undefined) {
                 taskNow.output = error.message
             }
-        })
-        process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+        }
+
+        const unhandledRejectionListener = (reason: any, promise: Promise<any>) => {
             if (taskNow != undefined) {
                 taskNow.output = reason
             }
-        })
-
-        try {
-            await new Listr([
-                {
-                    title: 'fetch bridge from relay',
-                    enabled: true,
-                    task: async(_: any, task: any): Promise<void> => {
-                        taskNow = task
-                        
-                        this.startTask()
-                        
-                        task.output = `fetching...`
-
-                        while (this.fetching) {
-                            await delay(500)
-                        }
-
-                        resolve(this.translateBridges)
-                    }
-                }
-            ]).run()
-        } catch (error) {
-            console.error(error)
         }
+        process.on('uncaughtException', uncaughtExceptionListener)
+        process.on('unhandledRejection', unhandledRejectionListener)
 
+        await new Listr([
+            {
+                title: 'fetch bridge from relay',
+                enabled: true,
+                task: async(_: any, task: any): Promise<void> => {
+                    taskNow = task
+                    
+                    this.startTask()
+                    
+                    task.output = `fetching...`
+
+                    while (this.fetching) {
+                        await delay(500)
+                    }
+
+                    process.removeListener('uncaughtException', uncaughtExceptionListener)
+                    process.removeListener('unhandledRejection', unhandledRejectionListener)
+                    resolve(this.translateBridges)
+                }
+            }
+        ]).run()
 
     })
 
