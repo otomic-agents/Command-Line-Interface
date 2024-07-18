@@ -660,6 +660,10 @@ export default class MonkeyActuator {
             succeed = resp.step >= 3
             if (succeed) {
                 //get business data and show txhash
+                const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
+                if (businessFull.event_transfer_in && businessFull.event_transfer_in.transfer_info) {
+                    task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in.transfer_info).transactionHash}`
+                }
             }
         }
 
@@ -707,6 +711,10 @@ export default class MonkeyActuator {
             succeed = resp.step >= 5
             if (succeed) {
                 //get business data and show txhash
+                const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
+                if (businessFull.event_transfer_in_confirm && businessFull.event_transfer_in_confirm.transfer_info) {
+                    task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_confirm.transfer_info).transactionHash}`
+                }
             }
         }
         resolve()
@@ -758,6 +766,11 @@ export default class MonkeyActuator {
             succeed = resp.step >= 7
             if (succeed) {
                 //get business data and show txhash
+                const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
+                if (businessFull.event_transfer_in_refund && businessFull.event_transfer_in_refund.transfer_info) {
+                    task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_refund.transfer_info).transactionHash}`
+                }
+
             }
         }
         resolve()

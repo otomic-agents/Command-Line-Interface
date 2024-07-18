@@ -24,7 +24,7 @@ export default class Swap extends Command {
 
     amount: Flags.string({char: 'a', description: 'amount for you want to exchange'}),
 
-    privateKeyFroSign: Flags.string({char: 'p', description: 'your wallet private key for sign this deal'}),
+    privateKeyForSign: Flags.string({char: 'p', description: 'your wallet private key for sign this deal'}),
 
     privateKeyForSend: Flags.string({char: 's', description: 'your wallet private key for send src token'}),
 
@@ -39,11 +39,11 @@ export default class Swap extends Command {
     let chainRpc = flags.chainRpc
     let bridgeName = flags.bridge
     let amount = flags.amount
-    let privateKeyFroSign = flags.privateKeyFroSign
+    let privateKeyForSign = flags.privateKeyForSign
     let privateKeyForSend = flags.privateKeyForSend
     let receivingAddress = flags.to
 
-    const swapActuator = new SwapActuator(relayUrl, network, chainRpc, bridgeName, amount, privateKeyFroSign, privateKeyForSend, receivingAddress)
+    const swapActuator = new SwapActuator(relayUrl, network, chainRpc, bridgeName, amount, privateKeyForSign, privateKeyForSend, receivingAddress)
     const resp = await swapActuator.run()
     console.log(resp)
     

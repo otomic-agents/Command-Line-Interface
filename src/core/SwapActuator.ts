@@ -313,9 +313,14 @@ export default class SwapActuator {
 
                         await delay(500)
                         const resp = await relay.getBusiness(business.hash)
+                        task.output = `waiting... step: ${resp.step}`
                         succeed = resp.step >= 3
                         if (succeed) {
                             //get business data and show txhash
+                            const businessFull = await relay.getBusinessFull(business.hash)
+                            if (businessFull.event_transfer_in && businessFull.event_transfer_in.transfer_info) {
+                                task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in.transfer_info).transactionHash}`
+                            }
                         }
                     }
 
@@ -375,9 +380,14 @@ export default class SwapActuator {
 
                         await delay(500)
                         const resp = await relay.getBusiness(business.hash)
+                        task.output = `waiting... step: ${resp.step}`
                         succeed = resp.step >= 5
                         if (succeed) {
                             //get business data and show txhash
+                            const businessFull = await relay.getBusinessFull(business.hash)
+                            if (businessFull.event_transfer_in_confirm && businessFull.event_transfer_in_confirm.transfer_info) {
+                                task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_confirm.transfer_info).transactionHash}`
+                            }
                         }
                     }
 

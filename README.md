@@ -144,7 +144,7 @@ FLAGS
                                    8aa00579c1307b0ef2c499ad98a8ce58e58(USDT)
   -c, --chainRpc=<value>           rpc config json, like: { bsc: "<RPC_BSC>" }
   -n, --network=<value>            network: main / test
-  -p, --privateKeyFroSign=<value>  your wallet private key for sign this deal
+  -p, --privateKeyForSign=<value>  your wallet private key for sign this deal
   -r, --relay=<value>              relay url
   -s, --privateKeyForSend=<value>  your wallet private key for send src token
   -t, --to=<value>                 your wallet address for receiving token
