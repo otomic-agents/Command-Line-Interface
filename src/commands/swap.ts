@@ -16,7 +16,7 @@ export default class Swap extends Command {
     // flag with a value (-r, --relay=VALUE)
     relay: Flags.string({char: 'r', description: 'relay url'}),
 
-    network: Flags.string({char: 'n', description: 'network: main / test'}),
+    network: Flags.string({char: 'n', description: 'network: mainnet / testnet'}),
 
     chainRpc: Flags.string({char: 'c', description: 'rpc config json, like: { bsc: "<RPC_BSC>" }'}),
 

@@ -4,7 +4,6 @@ import { Listr, delay } from 'listr2';
 import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, business as Business, ResponseTransferOut, ResponseSolana } from 'otmoic-software-development-kit';
 import Bignumber from 'Bignumber.js'
 import needle from 'needle'
-import { title } from 'process';
 
 function getRandomNumberInRange(n: number, m: number): number {
     return Math.floor(Math.random() * (m - n + 1) + n);
@@ -598,6 +597,10 @@ export default class MonkeyActuator {
                 this.config.receivingAddress, undefined, dealInfo.srcRpc, dealInfo.dstRpc)
         
         dealInfo.business = await relay.swap(dealInfo.quote, dealInfo.signData.signData, dealInfo.signData.signed)
+
+        if (dealInfo.business == undefined) {
+            throw new Error('failed to get business');
+        }
 
         if (dealInfo.business.locked == false) {
             throw new Error(`lp lock failed: ${JSON.stringify(dealInfo.business)}`);

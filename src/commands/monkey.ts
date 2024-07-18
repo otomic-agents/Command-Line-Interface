@@ -30,7 +30,7 @@ export default class Monkey extends Command {
 
     lp: Flags.string({char: 'l', description: 'the lp name to be tested. no restriction if empty.'}),
 
-    network: Flags.string({char: 'n', description: 'network: main / test'}),
+    network: Flags.string({char: 'n', description: 'network: mainnet / testnet'}),
 
     chainRpc: Flags.string({char: 'c', description: 'rpc config json, like: { bsc: "<RPC_BSC>" }'}),
 
