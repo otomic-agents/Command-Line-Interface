@@ -20,7 +20,9 @@ export default class Monkey extends Command {
 
     bridge: Flags.string({char: 'b', description: 'the bridges to be tested are separated by commas. If it is empty, there is no limit.'}),
 
-    privateKey: Flags.string({char: 'p', description: 'wallet private key used during testing'}),
+    privateKey: Flags.string({char: 'p', description: 'evm private key used during testing'}),
+    
+    solanaPrivateKey: Flags.string({char: 's', description: 'solana private key used during testing'}),
 
     webhook: Flags.string({char: 'w', description: 'webhook address for receiving execution reports'}),
 
@@ -34,7 +36,9 @@ export default class Monkey extends Command {
 
     chainRpc: Flags.string({char: 'c', description: 'rpc config json, like: { bsc: "<RPC_BSC>" }'}),
 
-    to: Flags.string({char: 'T', description: 'your wallet address for receiving token'}),
+    to: Flags.string({char: 'T', description: 'your evm address for receiving token'}),
+    
+    solanaTo: Flags.string({char: 'S', description: 'your solana address for receiving token'}),
   }
 
   public async run(): Promise<void> {
@@ -45,6 +49,7 @@ export default class Monkey extends Command {
     let amount = flags.amount
     let bridge = flags.bridge
     let privateKey = flags.privateKey
+    let solanaPrivateKey = flags.solanaPrivateKey
     let webhook = flags.webhook
     let type = flags.type
     let complaint = flags.complaint
@@ -52,8 +57,9 @@ export default class Monkey extends Command {
     let network = flags.network
     let chainRpc = flags.chainRpc
     let receivingAddress = flags.to
+    let solanaReceivingAddress = flags.solanaTo
 
-    let monkeyActuator = new MonkeyActuator(interval, relay, amount, bridge, privateKey, webhook, type, complaint, lp, network, chainRpc, receivingAddress)
+    let monkeyActuator = new MonkeyActuator(interval, relay, amount, bridge, privateKey, solanaPrivateKey, webhook, type, complaint, lp, network, chainRpc, receivingAddress, solanaReceivingAddress)
     monkeyActuator.run()
 
 

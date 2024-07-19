@@ -1,5 +1,6 @@
 import { prompt } from 'enquirer';
 import { ethers } from "ethers";
+import { Keypair } from '@solana/web3.js';
 import { Listr, delay } from 'listr2';
 import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, business as Business, ResponseTransferOut, ResponseSolana } from 'otmoic-software-development-kit';
 import Bignumber from 'Bignumber.js'
@@ -29,9 +30,15 @@ interface Config {
 
     privateKey: string
 
+    solanaPrivateKey: string
+
     sendingAddress: string
 
+    solanaSendingAddress: string
+
     receivingAddress: string
+
+    solanaReceivingAddress: string
 
     webhook: string
 
@@ -82,6 +89,8 @@ export default class MonkeyActuator {
 
     privateKey: string | undefined
 
+    solanaPrivateKey: string | undefined
+
     webhook: string | undefined
 
     type: string | undefined
@@ -98,6 +107,8 @@ export default class MonkeyActuator {
 
     receivingAddress: string | undefined
 
+    solanaReceivingAddress: string | undefined
+
     taskList: Listr | undefined
 
     config: Config = {
@@ -108,8 +119,11 @@ export default class MonkeyActuator {
         amountMax: 0,
         bridges: [],
         privateKey: '',
+        solanaPrivateKey: '',
         sendingAddress: '',
+        solanaSendingAddress: '',
         receivingAddress: '',
+        solanaReceivingAddress: '',
         webhook: '',
         type: [],
         complaint: [],
@@ -119,15 +133,16 @@ export default class MonkeyActuator {
     }
 
     constructor(interval: string | undefined, relay: string | undefined, amount: string | undefined, 
-        bridge: string | undefined, privateKey: string | undefined, webhook: string | undefined, 
+        bridge: string | undefined, privateKey: string | undefined, solanaPrivateKey: string | undefined, webhook: string | undefined, 
         type: string | undefined, complaint: string | undefined, lp: string | undefined, 
-        network: string | undefined, rpcs: string | undefined, receivingAddress: string | undefined) {
+        network: string | undefined, rpcs: string | undefined, receivingAddress: string | undefined, solanaReceivingAddress: string | undefined) {
 
         this.interval = interval
         this.relay = relay
         this.amount = amount
         this.bridge = bridge
         this.privateKey = privateKey
+        this.solanaPrivateKey = solanaPrivateKey
         this.webhook = webhook
         this.type = type
         this.complaint = complaint
@@ -135,6 +150,7 @@ export default class MonkeyActuator {
         this.network = network
         this.rpcs = rpcs == undefined ? {} : JSON.parse(rpcs)
         this.receivingAddress = receivingAddress
+        this.solanaReceivingAddress = solanaReceivingAddress
     }
 
     run = () => new Promise<void>(async (resolve, reject) => {
@@ -146,7 +162,9 @@ export default class MonkeyActuator {
         await this.initAmount()
         await this.initBridge()
         await this.initPrivateKey()
+        await this.initSolanaPrivateKey()
         await this.initReceivingAddress()
+        await this.initSolanaReceivingAddress()
         await this.initWebhook()
         await this.initType()
         await this.initLP()
@@ -926,7 +944,7 @@ export default class MonkeyActuator {
             const pvKeyValue: {value: string} = (await prompt({
                 type: 'input',
                 name: 'value',
-                message: 'please enter your private key for monkey test'
+                message: 'please enter your evm private key for monkey test'
             }))
             this.privateKey = pvKeyValue.value
         }
@@ -935,7 +953,26 @@ export default class MonkeyActuator {
         const wallet = new ethers.Wallet(this.config.privateKey)
         this.config.sendingAddress = wallet.address
 
-        console.log(`test wallet is: ${wallet.address}`)
+        console.log(`evm wallet is: ${wallet.address}`)
+        resolve()
+    })
+
+    initSolanaPrivateKey = () => new Promise<void>(async (resolve, reject) => {
+        if (this.solanaPrivateKey == undefined) {
+            const pvKeyValue: {value: string} = (await prompt({
+                type: 'input',
+                name: 'value',
+                message: 'please enter your solana private key for monkey test'
+            }))
+            this.solanaPrivateKey = pvKeyValue.value
+        }
+        this.config.solanaPrivateKey = this.solanaPrivateKey
+
+        const wallet  = Keypair.fromSecretKey(Uint8Array.from(Buffer.from(this.config.solanaPrivateKey.startsWith('0x') ? this.config.solanaPrivateKey.slice(2) : this.config.solanaPrivateKey, 'hex')))
+
+        this.config.solanaSendingAddress = wallet.publicKey.toBase58()
+
+        console.log(`solana wallet is: ${wallet.publicKey.toBase58()}`)
         resolve()
     })
 
@@ -944,9 +981,9 @@ export default class MonkeyActuator {
             const keyType: { value: string} = await prompt({
                 type: 'select',
                 name: 'value',
-                message: 'receiving address is ?',
+                message: 'evm receiving address is ?',
                 choices: [{
-                    name: 'same as test address',
+                    name: 'same as evm test address',
                     value: ''
                 }, {
                     name: 'enter a new address',
@@ -954,18 +991,48 @@ export default class MonkeyActuator {
                 }]
             });
 
-            if (keyType.value == 'same as test address') {
+            if (keyType.value == 'same as evm test address') {
                 this.receivingAddress = this.config.sendingAddress
             } else {
                 const addressValue: {value: string} = (await prompt({
                     type: 'input',
                     name: 'value',
-                    message: "please enter your wallet address, for receiving DstToken"
+                    message: "please enter your evm wallet address, for receiving DstToken"
                 }))
                 this.receivingAddress = addressValue.value
             }
         }
         this.config.receivingAddress = this.receivingAddress
+        resolve()
+    })
+
+    initSolanaReceivingAddress = () => new Promise<void>(async (resolve, reject) => {
+        if (this.solanaReceivingAddress == undefined) {
+            const keyType: { value: string} = await prompt({
+                type: 'select',
+                name: 'value',
+                message: 'solana receiving address is ?',
+                choices: [{
+                    name: 'same as solana test address',
+                    value: ''
+                }, {
+                    name: 'enter a new address',
+                    value: ''
+                }]
+            });
+
+            if (keyType.value == 'same as solana test address') {
+                this.solanaReceivingAddress = this.config.solanaSendingAddress
+            } else {
+                const addressValue: {value: string} = (await prompt({
+                    type: 'input',
+                    name: 'value',
+                    message: "please enter your solana wallet address, for receiving DstToken"
+                }))
+                this.solanaReceivingAddress = addressValue.value
+            }
+        }
+        this.config.solanaReceivingAddress = this.solanaReceivingAddress
         resolve()
     })
 
@@ -1049,8 +1116,13 @@ export default class MonkeyActuator {
     })
 
     isBalanceEnough = (bridge: Bridge) => new Promise<boolean>(async (resolve, reject) => {
-        
-        const balance = await assistive.GetBalance(bridge, this.config.sendingAddress, this.config.network, 
+        let address = ''
+        if (utils.GetChainType(bridge.src_chain_id) == 'evm') {
+            address = this.config.sendingAddress
+        } else if (utils.GetChainType(bridge.src_chain_id) == 'solana') {
+            address = this.config.solanaSendingAddress
+        }
+        const balance = await assistive.GetBalance(bridge, address, this.config.network, 
             this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()])
         if (parseFloat(balance) > 0) {
             resolve(true)
@@ -1060,7 +1132,13 @@ export default class MonkeyActuator {
     })
 
     getBalance = (bridge: Bridge) => new Promise<Bignumber>(async (resolve, reject) => {
-        const balance = await assistive.GetBalance(bridge, this.config.sendingAddress, this.config.network, 
+        let address = ''
+        if (utils.GetChainType(bridge.src_chain_id) == 'evm') {
+            address = this.config.sendingAddress
+        } else if (utils.GetChainType(bridge.src_chain_id) == 'solana') {
+            address = this.config.solanaSendingAddress
+        }
+        const balance = await assistive.GetBalance(bridge, address, this.config.network, 
             this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()])
         resolve(new Bignumber(balance))
     })
