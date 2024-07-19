@@ -348,7 +348,7 @@ export default class MonkeyActuator {
                                                 taskNow = task
         
                                                 let finished = false
-                                                this.cheatExchangeTxInCfm(task, dealInfo)
+                                                this.cheatExchangeTxInCfm(task, relay, dealInfo)
                                                     .then(() => finished = true)
                 
                                                 while (finished == false) {
@@ -436,7 +436,7 @@ export default class MonkeyActuator {
 
                                             if (dealInfo.complaint == true) {
 
-                                                await this.taskExchangeComplaint(dealInfo)
+                                                await this.taskExchangeComplaint(task, dealInfo)
                                             }
                                         }
 
@@ -716,8 +716,32 @@ export default class MonkeyActuator {
         resolve()
     })
 
-    cheatExchangeTxInCfm = (task: any, dealInfo: DealInfo) => new Promise<void>((resolve, reject) => {
-        // TODO FIXME
+    cheatExchangeTxInCfm = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
+        task.output = 'cheat confirm in sending...'
+
+        if (dealInfo.business == undefined) {
+            throw new Error("business is undefined");
+        }
+
+        if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+            const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, this.config.sendingAddress)
+            task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
+        } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
+            const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
+            let uuid: string | undefined
+            if (businessFull.event_transfer_in && businessFull.event_transfer_in.transfer_id) {
+                let uuidStr = businessFull.event_transfer_in.transfer_id
+                uuid = uuidStr.slice(-32)
+            }
+            if (uuid === undefined) {
+                throw new Error("failed to get transfer in uuid")
+            }
+            const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, this.config.solanaSendingAddress, uuid)
+            task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+        }
+        
+        await delay(50)
+
         resolve()
     })
 
@@ -803,8 +827,22 @@ export default class MonkeyActuator {
         resolve()
     })
 
-    taskExchangeComplaint = (dealInfo: DealInfo) => new Promise<void>((resolve, reject) => {
-        // TODO FIXME otmoic
+    taskExchangeComplaint = (task: any, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
+        task.output = 'complaiming...'
+
+        if (dealInfo.business == undefined) {
+            throw new Error("business is undefined");
+        }
+
+        const resp = await Business.complainByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network)
+        if (resp === true) {
+            task.title = `${task.title} -- submitted successfully`    
+        } else {
+            task.title = `${task.title} -- failed to submit due to ${resp}`    
+        }
+
+        await delay(50)
+
         resolve()
     })
 
