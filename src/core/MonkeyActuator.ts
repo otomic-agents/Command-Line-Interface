@@ -549,7 +549,7 @@ export default class MonkeyActuator {
         }
         
         const balance = await this.getBalance(dealInfo.bridge)
-        dealInfo.amount = balance.times(getRandomNumberInRange(this.config.amountMin, this.config.amountMax)).div(100).toFixed(8)
+        dealInfo.amount = balance.times(getRandomNumberInRange(this.config.amountMin, this.config.amountMax)).div(100).toFixed(2)
 
         dealInfo.type = this.config.type[getRandomNumberInRange(0, this.config.type.length - 1)]
         dealInfo.complaint = 'true' == this.config.complaint[getRandomNumberInRange(0, this.config.complaint.length - 1)]
