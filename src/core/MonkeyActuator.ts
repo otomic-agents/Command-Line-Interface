@@ -609,10 +609,20 @@ export default class MonkeyActuator {
 
         task.output = 'submitting...'
 
+        let privateKey = ''
+        let receivingAddress = ''
+        if (utils.GetChainType(dealInfo.quote.quote_base.bridge.src_chain_id) == 'evm') {
+            privateKey = this.config.privateKey
+            receivingAddress = this.config.receivingAddress
+        } else if (utils.GetChainType(dealInfo.quote.quote_base.bridge.src_chain_id) == 'solana') {
+            privateKey = this.config.solanaPrivateKey
+            receivingAddress = this.config.solanaReceivingAddress
+        }
+
         dealInfo.signData = 
             await Business.signQuoteByPrivateKey(
-                this.config.network, dealInfo.quote, this.config.privateKey, dealInfo.amount, 0, 
-                this.config.receivingAddress, undefined, dealInfo.srcRpc, dealInfo.dstRpc)
+                this.config.network, dealInfo.quote, privateKey, dealInfo.amount, 0, 
+                receivingAddress, undefined, dealInfo.srcRpc, dealInfo.dstRpc)
         
         dealInfo.business = await relay.swap(dealInfo.quote, dealInfo.signData.signData, dealInfo.signData.signed)
 
@@ -647,12 +657,11 @@ export default class MonkeyActuator {
             dealInfo.business.swap_asset_information.quote.quote_base.lp_bridge_address = dealInfo.business.swap_asset_information.sender
         }
 
-        const resp = await Business.transferOutByPrivateKey(dealInfo.business, this.config.privateKey, 
-            this.config.network, dealInfo.srcRpc)
-
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+            const resp = await Business.transferOutByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
             task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
+            const resp = await Business.transferOutByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc)
             task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
             dealInfo.uuid = (resp as ResponseSolana).uuid
         }
@@ -699,7 +708,7 @@ export default class MonkeyActuator {
             const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
             task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-            const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, dealInfo.uuid!)
+            const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, dealInfo.uuid!)
             task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
         }
         
@@ -758,7 +767,7 @@ export default class MonkeyActuator {
             const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
             task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-            const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, dealInfo.uuid!)
+            const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, dealInfo.uuid!)
             task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
         }
 
