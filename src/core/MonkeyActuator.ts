@@ -635,7 +635,7 @@ export default class MonkeyActuator {
         }
 
         if (dealInfo.business.locked == false) {
-            throw new Error(`lp lock failed: ${JSON.stringify(dealInfo.business)}`);
+            throw new Error(`lp lock failed: ${JSON.stringify(dealInfo.business.hash)}`);
         }
 
         task.title = `${task.title} -- (bidid:${dealInfo.business.hash})`
