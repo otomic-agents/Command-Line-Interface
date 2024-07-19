@@ -610,12 +610,16 @@ export default class MonkeyActuator {
         task.output = 'submitting...'
 
         let privateKey = ''
-        let receivingAddress = ''
         if (utils.GetChainType(dealInfo.quote.quote_base.bridge.src_chain_id) == 'evm') {
             privateKey = this.config.privateKey
-            receivingAddress = this.config.receivingAddress
         } else if (utils.GetChainType(dealInfo.quote.quote_base.bridge.src_chain_id) == 'solana') {
             privateKey = this.config.solanaPrivateKey
+        }
+
+        let receivingAddress = ''
+        if (utils.GetChainType(dealInfo.quote.quote_base.bridge.dst_chain_id) == 'evm') {
+            receivingAddress = this.config.receivingAddress
+        } else if (utils.GetChainType(dealInfo.quote.quote_base.bridge.dst_chain_id) == 'solana') {
             receivingAddress = this.config.solanaReceivingAddress
         }
 
