@@ -786,9 +786,9 @@ export default class MonkeyActuator {
         while (canDo == false) {
             await delay(1000)
 
-            canDo = Date.now() > ((dealInfo.business.swap_asset_information.agreement_reached_time + dealInfo.business.swap_asset_information.step_time_lock * 7) * 1000)
+            canDo = Date.now() > ((dealInfo.business.swap_asset_information.agreement_reached_time + dealInfo.business.swap_asset_information.step_time_lock * 7) * 1000 + 10 * 1000)
             
-            task.output = `can refund: ${canDo}, now: ${Date.now()}, time lock: ${(dealInfo.business.swap_asset_information.agreement_reached_time + dealInfo.business.swap_asset_information.step_time_lock * 7) * 1000}`
+            task.output = `can refund: ${canDo}, now: ${Date.now()}, time lock: ${(dealInfo.business.swap_asset_information.agreement_reached_time + dealInfo.business.swap_asset_information.step_time_lock * 7) * 1000 + 10 * 1000}`
         }
 
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
