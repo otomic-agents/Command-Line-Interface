@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import { Keypair } from '@solana/web3.js';
 import { Listr, delay } from 'listr2';
 import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, business as Business, ResponseTransferOut, ResponseSolana } from 'otmoic-software-development-kit';
-import Bignumber from 'Bignumber.js'
+import Bignumber from 'bignumber.js'
 import needle from 'needle'
 
 function getRandomNumberInRange(n: number, m: number): number {
