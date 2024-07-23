@@ -243,7 +243,7 @@ export default class MonkeyActuator {
                                 let errorMessage = "cannot get transfer out confirm message from relay when task timeout" 
                                 taskNow.output = errorMessage
                                 this.callWebHookFailed(taskNow, relay, dealInfo)
-                                throw new Error("errorMessage")
+                                throw new Error(errorMessage)
                             } else {
                                 if ((dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') && !dealInfo.gotTxIn) {
                                     this.callWebHookSucceed(taskNow, relay, dealInfo)
@@ -503,19 +503,29 @@ export default class MonkeyActuator {
 
     callWebHookSucceed = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>((resolve, reject) => {
         if (this.config.webhook != undefined) {
+
+            let swapInfo = dealInfo.business?.swap_asset_information
+            let { ["append_information"]: appendInfo, ...rest1 } = swapInfo!;
+            let { ["quote"]: quote, ...rest2 } = rest1!;
+
             needle('post', this.config.webhook, {
                 state: 'succeed',
                 relay: relay.relayUrl,
                 bridge: dealInfo.business?.swap_asset_information.quote.quote_base.bridge.bridge_name,
                 amount: dealInfo.business?.swap_asset_information.amount,
                 type: `test flow: ${dealInfo.type}`,
-                originData: objectToString(dealInfo)
+                swapDetail: objectToString(rest2)
             })
         }
     })
 
     callWebHookFailed = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>((resolve, reject) => {
         if (this.config.webhook != undefined) {
+
+            let swapInfo = dealInfo.business?.swap_asset_information
+            let { ["append_information"]: appendInfo, ...rest1 } = swapInfo!;
+            let { ["quote"]: quote, ...rest2 } = rest1!;
+
             needle('post', this.config.webhook, {
                 state: 'failed',
                 relay: relay.relayUrl,
@@ -524,7 +534,7 @@ export default class MonkeyActuator {
                 type: `test flow: ${dealInfo.type}`,
                 messageTitle: task.title,
                 messageData:  task.output,
-                originData: objectToString(dealInfo)
+                swapDetail: objectToString(rest2)
             })
         }
     })
@@ -779,7 +789,7 @@ export default class MonkeyActuator {
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'evm') {
 
             const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, sender)
-            task.title = `cheat confirm in -- ${(resp as ethers.ContractTransactionResponse).hash}`
+            task.title = `${task.title} -- cheat confirm in -- ${(resp as ethers.ContractTransactionResponse).hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'solana') {
             
             let uuid: string | undefined
@@ -791,7 +801,7 @@ export default class MonkeyActuator {
                 throw new Error("failed to get transfer in uuid")
             }
             const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, sender, uuid)
-            task.title = `cheat confirm in -- ${(resp as ResponseSolana).txHash}`
+            task.title = `${task.title} -- cheat confirm in -- ${(resp as ResponseSolana).txHash}`
         }
         
         await delay(50)
@@ -845,7 +855,7 @@ export default class MonkeyActuator {
                 //get business data and show txhash
                 const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
                 if (businessFull.event_transfer_out_confirm && businessFull.event_transfer_out_confirm.transfer_info) {
-                    task.title = `relay tx out confirm -- ${JSON.parse(businessFull.event_transfer_out_confirm.transfer_info).transactionHash}`
+                    task.title = `${task.title} - relay tx out confirm -- ${JSON.parse(businessFull.event_transfer_out_confirm.transfer_info).transactionHash}`
                 }
             }
         }
