@@ -239,8 +239,8 @@ export default class MonkeyActuator {
 
                         if (this.taskList != undefined) {
                             if (dealInfo.timeoutForRelayConfirmOut) {
-                                taskNow.title = "relay transfer out confirm"
-                                let errorMessage = "cannot get transfer out confirm message from relay when task timeout" 
+                                taskNow.title = `${taskNow.title} -- relay tx out confirm`
+                                let errorMessage = "relay tx out confirm - cannot get transfer out confirm message from relay when task timeout" 
                                 taskNow.output = errorMessage
                                 this.callWebHookFailed(taskNow, relay, dealInfo)
                                 throw new Error(errorMessage)
@@ -771,7 +771,7 @@ export default class MonkeyActuator {
     })
 
     cheatExchangeTxInCfm = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
-        task.output = 'cheat confirm in sending...'
+        task.output = 'user cheat confirm in sending...'
 
         if (dealInfo.business == undefined) {
             throw new Error("business is undefined");
@@ -789,7 +789,7 @@ export default class MonkeyActuator {
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'evm') {
 
             const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, sender)
-            task.title = `${task.title} -- cheat confirm in -- ${(resp as ethers.ContractTransactionResponse).hash}`
+            task.title = `${task.title} -- user cheat confirm in -- ${(resp as ethers.ContractTransactionResponse).hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'solana') {
             
             let uuid: string | undefined
@@ -801,7 +801,7 @@ export default class MonkeyActuator {
                 throw new Error("failed to get transfer in uuid")
             }
             const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, sender, uuid)
-            task.title = `${task.title} -- cheat confirm in -- ${(resp as ResponseSolana).txHash}`
+            task.title = `${task.title} -- user cheat confirm in -- ${(resp as ResponseSolana).txHash}`
         }
         
         await delay(50)
