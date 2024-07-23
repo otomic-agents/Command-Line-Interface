@@ -5,6 +5,7 @@ import { Listr, delay } from 'listr2';
 import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, business as Business, ResponseTransferOut, ResponseSolana } from 'otmoic-software-development-kit';
 import Bignumber from 'bignumber.js'
 import needle from 'needle'
+import { objectToString } from '../utils/flattenObject';
 
 function getRandomNumberInRange(n: number, m: number): number {
     return Math.floor(Math.random() * (m - n + 1) + n);
@@ -75,6 +76,10 @@ interface DealInfo {
     } | undefined
 
     uuid: string | undefined
+
+    timeoutForRelayConfirmOut: boolean | undefined
+
+    gotTxIn: boolean | undefined
 }
 
 export default class MonkeyActuator {
@@ -209,7 +214,9 @@ export default class MonkeyActuator {
             srcRpc: undefined,
             dstRpc: undefined,
             signData: undefined,
-            uuid: undefined
+            uuid: undefined,
+            timeoutForRelayConfirmOut: undefined,
+            gotTxIn: undefined
         }
 
         try {
@@ -231,10 +238,21 @@ export default class MonkeyActuator {
                         setTimeout(this.tick, 5000)
 
                         if (this.taskList != undefined) {
-                        
-                            this.callWebHookFailed(taskNow, relay, dealInfo)
-
-                            throw new Error("task timeout");
+                            if (dealInfo.timeoutForRelayConfirmOut) {
+                                taskNow.title = "relay transfer out confirm"
+                                let errorMessage = "cannot get transfer out confirm message from relay when task timeout" 
+                                taskNow.output = errorMessage
+                                this.callWebHookFailed(taskNow, relay, dealInfo)
+                                throw new Error("errorMessage")
+                            } else {
+                                if ((dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') && !dealInfo.gotTxIn) {
+                                    this.callWebHookSucceed(taskNow, relay, dealInfo)
+                                    throw new Error("task finished successfully")
+                                } else {
+                                    this.callWebHookFailed(taskNow, relay, dealInfo)
+                                    throw new Error("task timeout")
+                                }
+                            }
                         }
                 
                             
@@ -379,6 +397,16 @@ export default class MonkeyActuator {
                                             while (finished == false) {
                                                 await delay(100)
                                             }
+                                        } else if (dealInfo.type == 'cheat txin') {
+                                            taskNow = task
+        
+                                            let finished = false
+                                            this.taskExchangeRelayTxOutCfm(task, relay, dealInfo)
+                                                .then(() => finished = true)
+            
+                                            while (finished == false) {
+                                                await delay(100)
+                                            }
                                         } else {
                                             task.title = `${task.title} -- type ${dealInfo.type} skip this task`
                                         }
@@ -390,7 +418,7 @@ export default class MonkeyActuator {
                                     title: 'tx out refund',
                                     enable: true,
                                     task: async(_: any, task: any): Promise<void> => {
-                                        if (dealInfo.type != 'succeed') {
+                                        if (dealInfo.type == 'refund') {
                                             
                                             taskNow = task
         
@@ -410,7 +438,7 @@ export default class MonkeyActuator {
                                     title: 'tx in refund',
                                     enable: true,
                                     task: async(_: any, task: any): Promise<void> => {
-                                        if (dealInfo.type != 'succeed') {
+                                        if (dealInfo.type == 'refund') {
                                             taskNow = task
                                             
                                             let finished = false
@@ -481,6 +509,7 @@ export default class MonkeyActuator {
                 bridge: dealInfo.business?.swap_asset_information.quote.quote_base.bridge.bridge_name,
                 amount: dealInfo.business?.swap_asset_information.amount,
                 type: `test flow: ${dealInfo.type}`,
+                originData: objectToString(dealInfo)
             })
         }
     })
@@ -494,7 +523,8 @@ export default class MonkeyActuator {
                 amount: dealInfo.business?.swap_asset_information.amount,
                 type: `test flow: ${dealInfo.type}`,
                 messageTitle: task.title,
-                messageData:  task.output
+                messageData:  task.output,
+                originData: objectToString(dealInfo)
             })
         }
     })
@@ -690,6 +720,16 @@ export default class MonkeyActuator {
             task.output = `waiting... step: ${resp.step}`
             succeed = resp.step >= 3
             if (succeed) {
+                if (dealInfo.type == 'cheat amount') {
+                    dealInfo.gotTxIn = true
+                    throw new Error("lp should not send tx in for cheat amount case")
+                }
+
+                if (dealInfo.type == 'cheat address') {
+                    dealInfo.gotTxIn = true
+                    throw new Error("lp should not send tx in for cheat address case")
+                }
+
                 //get business data and show txhash
                 const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
                 if (businessFull.event_transfer_in && businessFull.event_transfer_in.transfer_info) {
@@ -739,7 +779,7 @@ export default class MonkeyActuator {
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'evm') {
 
             const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, sender)
-            task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
+            task.title = `cheat confirm in -- ${(resp as ethers.ContractTransactionResponse).hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'solana') {
             
             let uuid: string | undefined
@@ -751,7 +791,7 @@ export default class MonkeyActuator {
                 throw new Error("failed to get transfer in uuid")
             }
             const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, sender, uuid)
-            task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+            task.title = `cheat confirm in -- ${(resp as ResponseSolana).txHash}`
         }
         
         await delay(50)
@@ -784,6 +824,35 @@ export default class MonkeyActuator {
         }
         resolve()
     })
+
+    taskExchangeRelayTxOutCfm = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
+        task.output = 'relay tx out confirm waiting...'
+        
+        dealInfo.timeoutForRelayConfirmOut = true
+        let succeed = false
+
+        if (dealInfo.business == undefined) {
+            throw new Error("business is undefined");
+        }
+
+        while (succeed == false) {
+
+            await delay(500)
+            const resp = await relay.getBusiness(dealInfo.business.hash)
+            task.output = `waiting... relay tx out confirm: ${resp.transfer_out_confirm_id}`
+            succeed = resp.transfer_out_confirm_id > 0    
+            if (succeed) {
+                //get business data and show txhash
+                const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
+                if (businessFull.event_transfer_out_confirm && businessFull.event_transfer_out_confirm.transfer_info) {
+                    task.title = `relay tx out confirm -- ${JSON.parse(businessFull.event_transfer_out_confirm.transfer_info).transactionHash}`
+                }
+            }
+        }
+        resolve()
+    })
+
+
 
     taskExchangeTxOutRefund = (task: any, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
         task.output = 'checking...'
