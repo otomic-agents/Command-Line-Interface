@@ -16,7 +16,7 @@ export default class Monkey extends Command {
 
     relay: Flags.string({char: 'r', description: 'relay url'}),
 
-    amount: Flags.string({char: 'a', description: 'the percentage of srctokens exchanged (base of balance) in each test, random within a specific range, in the format of [min]-[max]'}),
+    amount: Flags.string({char: 'a', description: 'the per mille (num over 1000) of srctokens exchanged (base of balance) in each test, random within a specific range, in the format of [min]-[max]'}),
 
     bridge: Flags.string({char: 'b', description: 'the bridges to be tested are separated by commas. If it is empty, there is no limit.'}),
 

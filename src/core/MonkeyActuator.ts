@@ -549,7 +549,7 @@ export default class MonkeyActuator {
         }
         
         const balance = await this.getBalance(dealInfo.bridge)
-        dealInfo.amount = balance.times(getRandomNumberInRange(this.config.amountMin, this.config.amountMax)).div(100).toFixed(2)
+        dealInfo.amount = balance.times(getRandomNumberInRange(this.config.amountMin, this.config.amountMax)).div(1000).toFixed(6)
 
         dealInfo.type = this.config.type[getRandomNumberInRange(0, this.config.type.length - 1)]
         dealInfo.complaint = 'true' == this.config.complaint[getRandomNumberInRange(0, this.config.complaint.length - 1)]
@@ -727,11 +727,21 @@ export default class MonkeyActuator {
             throw new Error("business is undefined");
         }
 
-        if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
-            const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, this.config.sendingAddress)
+        const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
+        let sender: string | undefined
+        if (businessFull.event_transfer_in && businessFull.event_transfer_in.sender) {
+            sender = businessFull.event_transfer_in.sender
+        }
+        if (sender === undefined) {
+            throw new Error("failed to get sender address")
+        }
+
+        if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'evm') {
+
+            const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, sender)
             task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
-        } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-            const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
+        } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'solana') {
+            
             let uuid: string | undefined
             if (businessFull.event_transfer_in && businessFull.event_transfer_in.transfer_id) {
                 let uuidStr = businessFull.event_transfer_in.transfer_id
@@ -740,7 +750,7 @@ export default class MonkeyActuator {
             if (uuid === undefined) {
                 throw new Error("failed to get transfer in uuid")
             }
-            const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, this.config.solanaSendingAddress, uuid)
+            const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, sender, uuid)
             task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
         }
         
@@ -945,7 +955,7 @@ export default class MonkeyActuator {
             const amountValue: any = await prompt({
                 name: 'ConfigAmount',
                 type: 'snippet',
-                message: 'enter the amount, unit is percentage: [min]-[max]',
+                message: 'enter the amount, unit is per mille: [min]-[max]',
                 required: true,
                 template: `#{min}%-#{max}%`
             })
@@ -955,8 +965,8 @@ export default class MonkeyActuator {
         this.config.amountMin = parseInt(amountStr[0])
         this.config.amountMax = parseInt(amountStr[1])
 
-        if (this.config.amountMin < 0 || this.config.amountMin > 100 || this.config.amountMax < 0 || this.config.amountMax > 100) {
-            throw new Error("amount of percentage only support 0 ~ 100");
+        if (this.config.amountMin < 0 || this.config.amountMin > 1000 || this.config.amountMax < 0 || this.config.amountMax > 1000) {
+            throw new Error("amount of percentage only support 0 ~ 1000");
         }
         console.log(`amount of percentage min: ${this.config.amountMin}`)
         console.log(`amount of percentage max: ${this.config.amountMax}`)
