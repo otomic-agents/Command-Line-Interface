@@ -275,45 +275,51 @@ export default class AskActuator {
         let times = 5
         
         let taskNow : any | undefined = undefined
-        process.on('uncaughtException', (error: Error) => {
+        const uncaughtExceptionListener = (error: Error) => {
+            if (error.message.includes('xhr poll error') || error.message.includes('timeout')) {
+                console.error('relay web socket connection error', error)
+                process.exit(1)
+            }
             if (taskNow != undefined) {
                 taskNow.output = error.message
             }
-        })
-        process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
+        }
+
+        const unhandledRejectionListener = (reason: any, promise: Promise<any>) => {
             if (taskNow != undefined) {
                 taskNow.output = reason
             }
-        })
-        await delay(500)
-        try {
-            await new Listr([
-                {
-                    title: message,
-                    enabled: true,
-                    task: async(_: any, task: any): Promise<void> => {
-                        taskNow = task
-                        
-                        while (this.loading) {
-                            
-                            task.output = `${times}...`
-                            await delay(1000)
-                            times--
-
-                            if (autoStop) {
-                                if (times == 0) {
-                                    this.stopLoading()
-                                }
-                            }
-
-                        }
-                        resolve()
-                    }
-                }
-            ]).run()
-        } catch (error) {
-            console.error(error)
         }
+        process.on('uncaughtException', uncaughtExceptionListener)
+        process.on('unhandledRejection', unhandledRejectionListener)
+        await delay(500)
+        await new Listr([
+            {
+                title: message,
+                enabled: true,
+                task: async(_: any, task: any): Promise<void> => {
+                    taskNow = task
+
+                    while (this.loading) {
+                        
+                        task.output = `${times}...`
+                        await delay(1000)
+                        times--
+
+                        if (autoStop) {
+                            if (times == 0) {
+                                this.stopLoading()
+                            }
+                        }
+
+                    }
+                    
+                    process.removeListener('uncaughtException', uncaughtExceptionListener)
+                    process.removeListener('unhandledRejection', unhandledRejectionListener)
+                    resolve()
+                }
+            }
+        ]).run()
     })
 
     stopLoading = () => {
