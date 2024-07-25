@@ -1,7 +1,7 @@
 {
   "name": "otmoiccli",
   "description": "otmoic-cli has functions such as generating account reports, querying quotes, and making exchanges.",
-  "version": "0.0.1",
+  "version": "0.0.6",
   "author": "bytetrade",
   "bin": {
     "otmoiccli": "./bin/run.js",
@@ -72,7 +72,7 @@
     "lint": "eslint . --ext .ts",
     "postpack": "shx rm -f oclif.manifest.json",
     "posttest": "npm run lint",
-    "prepack": "oclif manifest && oclif readme",
+    "prepack": "oclif manifest && oclif readme && cp -r node_modules/bignumber.js dist/",
     "test": "mocha --forbid-only \"test/**/*.test.ts\"",
     "version": "oclif readme && git add README.md"
   },

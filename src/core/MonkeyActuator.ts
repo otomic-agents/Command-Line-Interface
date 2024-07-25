@@ -2,7 +2,7 @@ import { prompt } from 'enquirer';
 import { ethers } from "ethers";
 import { Listr, delay } from 'listr2';
 import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, business as Business, ResponseTransferOut, ResponseSolana } from 'otmoic-software-development-kit';
-import Bignumber from 'Bignumber.js'
+import Bignumber from 'bignumber.js'
 import needle from 'needle'
 import { title } from 'process';
 

@@ -20,7 +20,7 @@ $ npm install -g otmoiccli
 $ otmoiccli COMMAND
 running command...
 $ otmoiccli (--version)
-otmoiccli/0.0.1 darwin-arm64 node-v20.11.1
+otmoiccli/0.0.6 darwin-arm64 node-v20.11.1
 $ otmoiccli --help [COMMAND]
 USAGE
   $ otmoiccli COMMAND
@@ -58,7 +58,7 @@ EXAMPLES
   $ otmoiccli ask
 ```
 
-_See code: [src/commands/ask.ts](https://github.com/otmoic/Command-Line-Interface/blob/v0.0.1/src/commands/ask.ts)_
+_See code: [src/commands/ask.ts](https://github.com/otmoic/Command-Line-Interface/blob/v0.0.6/src/commands/ask.ts)_
 
 ## `otmoiccli help [COMMAND]`
 
@@ -87,9 +87,10 @@ describe the command here
 ```
 USAGE
   $ otmoiccli monkey [-i <value>] [-r <value>] [-a <value>] [-b <value>] [-p <value>] [-w <value>] [-t
-    <value>] [-l <value>] [-n <value>] [-c <value>]
+    <value>] [-C <value>] [-l <value>] [-n <value>] [-c <value>]
 
 FLAGS
+  -C, --complaint=<value>   do complaint, enter [true] or [false], if "type" is not "succeed", complaint can be run
   -a, --amount=<value>      the percentage of srctokens exchanged (base of balance) in each test, random within a
                             specific range, in the format of [min]-[max]
   -b, --bridge=<value>      the bridges to be tested are separated by commas. If it is empty, there is no limit.
@@ -100,7 +101,8 @@ FLAGS
   -n, --network=<value>     network: main / test
   -p, --privateKey=<value>  wallet private key used during testing
   -r, --relay=<value>       relay url
-  -t, --type=<value>        the test type, separated by commas, [succeed] or [refund]
+  -t, --type=<value>        the test type, separated by commas, [succeed] or [refund] or [cheat amount] or [cheat
+                            address] or [cheat txin]
   -w, --webhook=<value>     webhook address for receiving execution reports
 
 DESCRIPTION
@@ -110,7 +112,7 @@ EXAMPLES
   $ otmoiccli monkey
 ```
 
-_See code: [src/commands/monkey.ts](https://github.com/otmoic/Command-Line-Interface/blob/v0.0.1/src/commands/monkey.ts)_
+_See code: [src/commands/monkey.ts](https://github.com/otmoic/Command-Line-Interface/blob/v0.0.6/src/commands/monkey.ts)_
 
 ## `otmoiccli reportforms`
 
@@ -127,7 +129,7 @@ EXAMPLES
   $ otmoiccli reportforms
 ```
 
-_See code: [src/commands/reportforms.ts](https://github.com/otmoic/Command-Line-Interface/blob/v0.0.1/src/commands/reportforms.ts)_
+_See code: [src/commands/reportforms.ts](https://github.com/otmoic/Command-Line-Interface/blob/v0.0.6/src/commands/reportforms.ts)_
 
 ## `otmoiccli swap`
 
@@ -156,5 +158,5 @@ EXAMPLES
   $ otmoiccli swap
 ```
 
-_See code: [src/commands/swap.ts](https://github.com/otmoic/Command-Line-Interface/blob/v0.0.1/src/commands/swap.ts)_
+_See code: [src/commands/swap.ts](https://github.com/otmoic/Command-Line-Interface/blob/v0.0.6/src/commands/swap.ts)_
 <!-- commandsstop -->
