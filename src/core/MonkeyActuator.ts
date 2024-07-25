@@ -242,6 +242,7 @@ export default class MonkeyActuator {
                                     taskNow.output = "relay tx out confirm - cannot get transfer out confirm event from relay at task timeout" 
                                     this.callWebHookFailed(taskNow, relay, dealInfo)
                                 } else if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
+                                    this.taskExchangeTxOutRefund(taskNow, dealInfo)
                                     this.callWebHookSucceed(taskNow, relay, dealInfo)
                                 }
                             } else {
