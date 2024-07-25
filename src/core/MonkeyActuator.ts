@@ -1,7 +1,7 @@
 import { prompt } from 'enquirer';
 import { ethers } from "ethers";
 import { Keypair } from '@solana/web3.js';
-import { Listr, delay } from 'listr2';
+import { Listr, delay, PRESET_TIMESTAMP } from 'listr2';
 import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, business as Business, ResponseTransferOut, ResponseSolana } from 'otmoic-software-development-kit';
 import Bignumber from 'bignumber.js'
 import needle from 'needle'
@@ -110,7 +110,7 @@ export default class MonkeyActuator {
 
     solanaReceivingAddress: string | undefined
 
-    taskList: Listr | undefined
+    taskList: Listr<any, "simple", "simple"> | undefined
 
     config: Config = {
         intervalMin: 0,
@@ -175,28 +175,8 @@ export default class MonkeyActuator {
         this.tick()
     })
 
+
     tick = () => new Promise<void>(async (resolve, reject) => {
-        
-        let taskNow : any | undefined = undefined
-        process.on('uncaughtException', (error: Error) => {
-            if (taskNow != undefined) {
-                try {
-                    taskNow.output = error.message
-                } catch (error) {
-                    
-                }
-            }
-        })
-        process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
-            if (taskNow != undefined) {
-                try {
-                    taskNow.output = reason
-                } catch (error) {
-                    
-                }
-                
-            }
-        })
 
         const relay = new Relay(this.config.relayUrl);
 
@@ -228,28 +208,27 @@ export default class MonkeyActuator {
                             await delay(1000)
                         }
 
-
-                        setTimeout(this.tick, 5000)
-
                         if (this.taskList != undefined) {
                             if (dealInfo.type?.startsWith('cheat')) {
 
                                 if (dealInfo.complaint == true) {
-                                    await this.taskExchangeComplaint(taskNow, dealInfo)
+                                    await this.taskExchangeComplaint(task, dealInfo)
                                 }
 
                                 if (dealInfo.type == 'cheat txin') {
-                                    taskNow.output = "relay tx out confirm - cannot get transfer out confirm event from relay at task timeout" 
-                                    this.callWebHookFailed(taskNow, relay, dealInfo)
+                                    task.output = "relay tx out confirm - cannot get transfer out confirm event from relay at task timeout" 
+                                    await this.callWebHookFailed(task, relay, dealInfo)
                                 } else if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
-                                    this.taskExchangeTxOutRefund(taskNow, dealInfo)
-                                    this.callWebHookSucceed(taskNow, relay, dealInfo)
+                                    await this.taskExchangeTxOutRefund(task, dealInfo)
+                                    await this.callWebHookSucceed(task, relay, dealInfo)
                                 }
                             } else {
-                                this.callWebHookFailed(taskNow, relay, dealInfo)
+                                await this.callWebHookFailed(task, relay, dealInfo)
                             }
-                            throw new Error("task timeout")
                         }
+                        
+                        this.taskList = undefined
+                        throw new Error("tasks finished")
                     },
                 },
                 {
@@ -260,7 +239,6 @@ export default class MonkeyActuator {
                             title: 'random bridge',
                             enabled: true,
                             task: async(_: any, task: any): Promise<void> => {
-                                taskNow = task
                                 
                                 let finished = false
                                 this.taskRandomBridge(task, relay, dealInfo)
@@ -275,9 +253,7 @@ export default class MonkeyActuator {
                             title: 'random deal',
                             enabled: true,
                             task: async(_: any, task: any): Promise<void> => {
-                                
-                                taskNow = task
-        
+                                  
                                 let finished = false
                                 this.taskRandomDeal(task, dealInfo)
                                     .then(() => finished = true)
@@ -292,8 +268,6 @@ export default class MonkeyActuator {
                             enabled: true,
                             task: async(_: any, task: any): Promise<void> => {
                                 
-                                taskNow = task
-        
                                 let finished = false
                                 this.taskSubmitDeal(task, relay, dealInfo)
                                     .then(() => finished = true)
@@ -310,9 +284,7 @@ export default class MonkeyActuator {
                                 {
                                     title: 'tx out',
                                     enable: true,
-                                    task: async(_: any, task: any): Promise<void> => {
-                                        
-                                        taskNow = task
+                                    task: async(_: any, task: any): Promise<void> => {               
         
                                         let finished = false
                                         this.taskExchangeTxOut(task, dealInfo)
@@ -328,8 +300,6 @@ export default class MonkeyActuator {
                                     enable: true,
                                     task: async(_: any, task: any): Promise<void> => {
                                         
-                                        taskNow = task
-        
                                         let finished = false
                                         this.taskExchangeTxIn(task, relay, dealInfo)
                                             .then(() => finished = true)
@@ -345,8 +315,7 @@ export default class MonkeyActuator {
                                     task: async(_: any, task: any): Promise<void> => {
                                         
                                         if (dealInfo.type == 'succeed') {
-                                            taskNow = task
-        
+                                            
                                             let finished = false
                                             this.taskExchangeTxOutCfm(task, dealInfo)
                                                 .then(() => finished = true)
@@ -357,7 +326,7 @@ export default class MonkeyActuator {
                                         } else {
 
                                             if (dealInfo.type == 'cheat txin') {
-                                                taskNow = task
+                                                
         
                                                 let finished = false
                                                 this.cheatExchangeTxInCfm(task, relay, dealInfo)
@@ -367,13 +336,10 @@ export default class MonkeyActuator {
                                                     await delay(100)
                                                 }
                                             } else {
-                                                task.title = `${task.title} -- type ${dealInfo.type} skip this task`
+                                                task.output = `${task.title} -- type ${dealInfo.type} skip this task`
                                             }
-
                                             
-                                        }
-                                        
-                                        
+                                        }  
                                     }
                                 },
                                 {
@@ -382,7 +348,7 @@ export default class MonkeyActuator {
                                     task: async(_: any, task: any): Promise<void> => {
                                         
                                         if (dealInfo.type == 'succeed') {
-                                            taskNow = task
+                                            
         
                                             let finished = false
                                             this.taskExchangeTxInCfm(task, relay, dealInfo)
@@ -392,7 +358,7 @@ export default class MonkeyActuator {
                                                 await delay(100)
                                             }
                                         } else if (dealInfo.type == 'cheat txin') {
-                                            taskNow = task
+                                            
         
                                             let finished = false
                                             this.taskExchangeRelayTxOutCfm(task, relay, dealInfo)
@@ -402,7 +368,7 @@ export default class MonkeyActuator {
                                                 await delay(100)
                                             }
                                         } else {
-                                            task.title = `${task.title} -- type ${dealInfo.type} skip this task`
+                                            task.output = `${task.title} -- type ${dealInfo.type} skip this task`
                                         }
                                         
         
@@ -413,8 +379,6 @@ export default class MonkeyActuator {
                                     enable: true,
                                     task: async(_: any, task: any): Promise<void> => {
                                         if (dealInfo.type == 'refund' || dealInfo.type == 'cheat address' || dealInfo.type == 'cheat amount') {
-                                            
-                                            taskNow = task
         
                                             let finished = false
                                             this.taskExchangeTxOutRefund(task, dealInfo)
@@ -424,7 +388,7 @@ export default class MonkeyActuator {
                                                 await delay(100)
                                             }
                                         } else {
-                                            task.title = `${task.title} -- type ${dealInfo.type} skip this task`
+                                            task.output = `${task.title} -- type ${dealInfo.type} skip this task`
                                         }
                                     }
                                 },
@@ -433,7 +397,7 @@ export default class MonkeyActuator {
                                     enable: true,
                                     task: async(_: any, task: any): Promise<void> => {
                                         if (dealInfo.type == 'refund') {
-                                            taskNow = task
+                                            
                                             
                                             let finished = false
                                             this.taskExchangeTxInRefund(task, relay, dealInfo)
@@ -443,7 +407,7 @@ export default class MonkeyActuator {
                                                 await delay(100)
                                             }
                                         } else {
-                                            task.title = `${task.title} -- type ${dealInfo.type} skip this task`
+                                            task.output = `${task.title} -- type ${dealInfo.type} skip this task`
                                         }
         
                                     }
@@ -452,7 +416,7 @@ export default class MonkeyActuator {
                                     title: 'complaint',
                                     enable: true,
                                     task: async(_: any, task: any): Promise<void> => {
-                                        taskNow = task
+                                        
 
                                         if (dealInfo.type?.startsWith('cheat')) {
 
@@ -464,48 +428,54 @@ export default class MonkeyActuator {
 
                                         if (dealInfo.type == 'cheat address' || dealInfo.type == 'cheat amount') {
                                             task.output = 'lp should not send tx in for the case'
-                                            this.callWebHookFailed(task, relay, dealInfo)
+                                            await this.callWebHookFailed(task, relay, dealInfo)
                                         } else {
-                                            this.callWebHookSucceed(task, relay, dealInfo)
+                                            await this.callWebHookSucceed(task, relay, dealInfo)
                                         }
 
                                         this.taskList = undefined
                                     }
                                 }
                             ], {
-                                rendererOptions: { collapseSubtasks: false },
+                                renderer: 'simple',
+                                rendererOptions: { 
+                                    timestamp: PRESET_TIMESTAMP
+                                },
                                 exitOnError: true,
                                 concurrent: false,
                             })
                         },
                     ], {
-                        rendererOptions: { collapseSubtasks: false },
+                        renderer: 'simple',
+                        rendererOptions: { 
+                            timestamp: PRESET_TIMESTAMP
+                        },
                         exitOnError: true,
                         concurrent: false,
                     })
                 }
             ], {
                 concurrent: true,
-                rendererOptions: { collapseSubtasks: false },
+                renderer: 'simple',
+                rendererOptions: { 
+                    timestamp: PRESET_TIMESTAMP
+                },
                 exitOnError: true
             })
             this.taskList.run()
         } catch (error) {
             console.error(error)
         }
-
-
-
     })
 
-    callWebHookSucceed = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>((resolve, reject) => {
+    callWebHookSucceed = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
         if (this.config.webhook != undefined) {
 
             let swapInfo = dealInfo.business?.swap_asset_information
             let { ["append_information"]: appendInfo, ...rest1 } = swapInfo!;
             let { ["quote"]: quote, ...rest2 } = rest1!;
 
-            needle('post', this.config.webhook, {
+            await needle('post', this.config.webhook, {
                 state: 'succeed',
                 relay: relay.relayUrl,
                 bridge: dealInfo.business?.swap_asset_information.quote.quote_base.bridge.bridge_name,
@@ -513,17 +483,19 @@ export default class MonkeyActuator {
                 type: `test flow: ${dealInfo.type}`,
                 swapDetail: objectToString(rest2)
             })
+
+            resolve()
         }
     })
 
-    callWebHookFailed = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>((resolve, reject) => {
+    callWebHookFailed = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
         if (this.config.webhook != undefined) {
 
             let swapInfo = dealInfo.business?.swap_asset_information
             let { ["append_information"]: appendInfo, ...rest1 } = swapInfo!;
             let { ["quote"]: quote, ...rest2 } = rest1!;
 
-            needle('post', this.config.webhook, {
+            await needle('post', this.config.webhook, {
                 state: 'failed',
                 relay: relay.relayUrl,
                 bridge: dealInfo.business?.swap_asset_information.quote.quote_base.bridge.bridge_name,
@@ -533,6 +505,8 @@ export default class MonkeyActuator {
                 messageData:  task.output,
                 swapDetail: objectToString(rest2)
             })
+
+            resolve()
         }
     })
 
@@ -572,7 +546,7 @@ export default class MonkeyActuator {
 
         dealInfo.bridge = enoughList[getRandomNumberInRange(0, enoughList.length - 1)]
 
-        task.title = `${task.title} --- (${dealInfo.bridge.src_chain_id}-${dealInfo.bridge.src_token}--->${dealInfo.bridge.dst_chain_id}-${dealInfo.bridge.dst_token})`
+        task.output= `${task.title} --- (${dealInfo.bridge.src_chain_id}-${dealInfo.bridge.src_token}--->${dealInfo.bridge.dst_chain_id}-${dealInfo.bridge.dst_token})`
 
         await delay(50)
         resolve()
@@ -591,7 +565,7 @@ export default class MonkeyActuator {
         dealInfo.type = this.config.type[getRandomNumberInRange(0, this.config.type.length - 1)]
         dealInfo.complaint = 'true' == this.config.complaint[getRandomNumberInRange(0, this.config.complaint.length - 1)]
 
-        task.title = `${task.title} --- (amount:${dealInfo.amount}) --- (type:${dealInfo.type})`
+        task.output = `${task.title} --- (amount:${dealInfo.amount}) --- (type:${dealInfo.type})`
 
         await delay(50)
         resolve()
@@ -675,7 +649,7 @@ export default class MonkeyActuator {
             throw new Error(`lp lock failed: ${JSON.stringify(dealInfo.business.hash)}`);
         }
 
-        task.title = `${task.title} -- (bidid:${dealInfo.business.hash})`
+        task.output = `${task.title} -- (bidid:${dealInfo.business.hash})`
 
         await delay(50)
         resolve()
@@ -700,10 +674,10 @@ export default class MonkeyActuator {
 
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
             const resp = await Business.transferOutByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
-            task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
+            task.output = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
             const resp = await Business.transferOutByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc)
-            task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+            task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
             dealInfo.uuid = (resp as ResponseSolana).uuid
         }
 
@@ -732,9 +706,9 @@ export default class MonkeyActuator {
                 const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
                 if (businessFull.event_transfer_in && businessFull.event_transfer_in.transfer_info) {
                     if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
-                        task.title = `${task.title} -- lp should not send tx in for the case - ${JSON.parse(businessFull.event_transfer_in.transfer_info).transactionHash}`
+                        task.output = `${task.title} -- lp should not send tx in for the case - ${JSON.parse(businessFull.event_transfer_in.transfer_info).transactionHash}`
                     } else {
-                        task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in.transfer_info).transactionHash}`
+                        task.output = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in.transfer_info).transactionHash}`
                     }
                 } else {
                     throw new Error("getBusinessFull failed to return data with event_transfer_in info")
@@ -754,10 +728,10 @@ export default class MonkeyActuator {
 
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
             const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
-            task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
+            task.output = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
             const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, dealInfo.uuid!)
-            task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+            task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
         }
         
         await delay(50)
@@ -783,7 +757,7 @@ export default class MonkeyActuator {
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'evm') {
 
             const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, sender)
-            task.title = `${task.title} -- user cheat confirm in -- ${(resp as ethers.ContractTransactionResponse).hash}`
+            task.output = `${task.title} -- user cheat confirm in -- ${(resp as ethers.ContractTransactionResponse).hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'solana') {
             
             let uuid: string | undefined
@@ -795,7 +769,7 @@ export default class MonkeyActuator {
                 throw new Error("failed to get transfer in uuid")
             }
             const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, sender, uuid)
-            task.title = `${task.title} -- user cheat confirm in -- ${(resp as ResponseSolana).txHash}`
+            task.output = `${task.title} -- user cheat confirm in -- ${(resp as ResponseSolana).txHash}`
         }
         
         await delay(50)
@@ -822,7 +796,7 @@ export default class MonkeyActuator {
                 //get business data and show txhash
                 const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
                 if (businessFull.event_transfer_in_confirm && businessFull.event_transfer_in_confirm.transfer_info) {
-                    task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_confirm.transfer_info).transactionHash}`
+                    task.output = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_confirm.transfer_info).transactionHash}`
                 }
             }
         }
@@ -848,7 +822,7 @@ export default class MonkeyActuator {
                 //get business data and show txhash
                 const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
                 if (businessFull.event_transfer_out_confirm && businessFull.event_transfer_out_confirm.transfer_info) {
-                    task.title = `${task.title} - relay tx out confirm -- ${JSON.parse(businessFull.event_transfer_out_confirm.transfer_info).transactionHash}`
+                    task.output = `${task.title} - relay tx out confirm -- ${JSON.parse(businessFull.event_transfer_out_confirm.transfer_info).transactionHash}`
                 }
             }
         }
@@ -875,10 +849,10 @@ export default class MonkeyActuator {
 
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
             const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
-            task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
+            task.output= `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
             const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, dealInfo.uuid!)
-            task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+            task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
         }
 
         await delay(50)
@@ -905,7 +879,7 @@ export default class MonkeyActuator {
                 //get business data and show txhash
                 const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
                 if (businessFull.event_transfer_in_refund && businessFull.event_transfer_in_refund.transfer_info) {
-                    task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_refund.transfer_info).transactionHash}`
+                    task.output = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_refund.transfer_info).transactionHash}`
                 }
 
             }
@@ -922,9 +896,9 @@ export default class MonkeyActuator {
 
         const resp = await Business.complainByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network)
         if (resp === true) {
-            task.title = `${task.title} -- submitted successfully`    
+            task.output = `${task.title} -- submitted successfully`    
         } else {
-            task.title = `${task.title} -- failed to submit due to ${resp}`    
+            task.output = `${task.title} -- failed to submit due to ${resp}`    
         }
 
         await delay(50)
