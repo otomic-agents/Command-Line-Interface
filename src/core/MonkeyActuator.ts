@@ -876,9 +876,11 @@ export default class MonkeyActuator {
 
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
             const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
+            task.output= `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
             task.title= `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
             const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, dealInfo.uuid!)
+            task.output = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
             task.title = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
         }
 
@@ -923,9 +925,11 @@ export default class MonkeyActuator {
 
         const resp = await Business.complainByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network)
         if (resp === true) {
-            task.title = `${task.title} -- submitted successfully`    
+            task.output = `${task.title} -- complaint -- submitted successfully` 
+            task.title = `${task.title} -- complaint -- com submitted successfully`
         } else {
-            task.title = `${task.title} -- failed to submit due to ${resp}`    
+            task.output = `${task.title} -- complaint -- failed to submit due to ${resp}`
+            task.title = `${task.title} -- complaint -- failed to submit due to ${resp}`
         }
 
         await delay(50)
