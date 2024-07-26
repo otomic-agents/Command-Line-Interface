@@ -78,6 +78,8 @@ interface DealInfo {
     } | undefined
 
     uuid: string | undefined
+
+    step: number | undefined
 }
 
 export default class MonkeyActuator {
@@ -195,6 +197,7 @@ export default class MonkeyActuator {
             dstRpc: undefined,
             signData: undefined,
             uuid: undefined,
+            step: undefined
         }
 
         let concurrentTaskOption: any
@@ -262,7 +265,12 @@ export default class MonkeyActuator {
                                 }
 
                                 if (dealInfo.type == 'cheat txin') {
-                                    task.output = "relay tx out confirm - cannot get transfer out confirm event from relay at task timeout" 
+                                    if (dealInfo.step == 2) {
+                                        task.output = "cheat txin -- cannot get lp tx in, going to refund tx out"
+                                        await this.taskExchangeTxOutRefund(task, dealInfo) 
+                                    } else if (dealInfo.step == 4) {
+                                        task.output = "relay tx out confirm - cannot get transfer out confirm event from relay at task timeout" 
+                                    }
                                     await this.callWebHookFailed(task, relay, dealInfo)
                                 } else if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
                                     await this.taskExchangeTxOutRefund(task, dealInfo)
@@ -331,7 +339,7 @@ export default class MonkeyActuator {
                                     title: 'tx out',
                                     enable: true,
                                     task: async(_: any, task: any): Promise<void> => {               
-        
+                                        dealInfo.step = 1
                                         let finished = false
                                         this.taskExchangeTxOut(task, dealInfo)
                                             .then(() => finished = true)
@@ -345,7 +353,7 @@ export default class MonkeyActuator {
                                     title: 'tx in',
                                     enable: true,
                                     task: async(_: any, task: any): Promise<void> => {
-                                        
+                                        dealInfo.step = 2
                                         let finished = false
                                         this.taskExchangeTxIn(task, relay, dealInfo)
                                             .then(() => finished = true)
@@ -359,7 +367,7 @@ export default class MonkeyActuator {
                                     title: 'tx out confirm',
                                     enable: true,
                                     task: async(_: any, task: any): Promise<void> => {
-                                        
+                                        dealInfo.step = 3
                                         if (dealInfo.type == 'succeed') {
                                             
                                             let finished = false
@@ -392,7 +400,7 @@ export default class MonkeyActuator {
                                     title: 'tx in confirm',
                                     enable: true,
                                     task: async(_: any, task: any): Promise<void> => {
-                                        
+                                        dealInfo.step = 4
                                         if (dealInfo.type == 'succeed') {
                                             
         
@@ -424,6 +432,7 @@ export default class MonkeyActuator {
                                     title: 'tx out refund',
                                     enable: true,
                                     task: async(_: any, task: any): Promise<void> => {
+                                        dealInfo.step = 5
                                         if (dealInfo.type == 'refund' || dealInfo.type == 'cheat address' || dealInfo.type == 'cheat amount') {
         
                                             let finished = false
@@ -442,6 +451,7 @@ export default class MonkeyActuator {
                                     title: 'tx in refund',
                                     enable: true,
                                     task: async(_: any, task: any): Promise<void> => {
+                                        dealInfo.step = 6
                                         if (dealInfo.type == 'refund') {
                                             
                                             
@@ -462,7 +472,7 @@ export default class MonkeyActuator {
                                     title: 'complaint',
                                     enable: true,
                                     task: async(_: any, task: any): Promise<void> => {
-                                        
+                                        dealInfo.step = 7
 
                                         if (dealInfo.type?.startsWith('cheat')) {
 
