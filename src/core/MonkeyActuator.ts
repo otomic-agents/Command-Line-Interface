@@ -502,6 +502,7 @@ export default class MonkeyActuator {
 
             await needle('post', this.config.webhook, {
                 state: 'succeed',
+                network: this.config.network,
                 relay: relay.relayUrl,
                 bridge: dealInfo.business?.swap_asset_information.quote.quote_base.bridge.bridge_name,
                 amount: dealInfo.business?.swap_asset_information.amount,
@@ -523,6 +524,7 @@ export default class MonkeyActuator {
 
             await needle('post', this.config.webhook, {
                 state: 'failed',
+                network: this.config.network,
                 relay: relay.relayUrl,
                 bridge: dealInfo.business?.swap_asset_information.quote.quote_base.bridge.bridge_name,
                 amount: dealInfo.business?.swap_asset_information.amount,
