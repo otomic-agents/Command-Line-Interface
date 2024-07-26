@@ -39,6 +39,8 @@ export default class Monkey extends Command {
     to: Flags.string({char: 'T', description: 'your evm address for receiving token'}),
     
     solanaTo: Flags.string({char: 'S', description: 'your solana address for receiving token'}),
+
+    debug: Flags.string({char: 'd', description: 'output verbose logs for debugging if true, otherwise be false'}),
   }
 
   public async run(): Promise<void> {
@@ -58,8 +60,9 @@ export default class Monkey extends Command {
     let chainRpc = flags.chainRpc
     let receivingAddress = flags.to
     let solanaReceivingAddress = flags.solanaTo
+    let debug = flags.debug
 
-    let monkeyActuator = new MonkeyActuator(interval, relay, amount, bridge, privateKey, solanaPrivateKey, webhook, type, complaint, lp, network, chainRpc, receivingAddress, solanaReceivingAddress)
+    let monkeyActuator = new MonkeyActuator(interval, relay, amount, bridge, privateKey, solanaPrivateKey, webhook, type, complaint, lp, network, chainRpc, receivingAddress, solanaReceivingAddress, debug)
     monkeyActuator.run()
 
 
