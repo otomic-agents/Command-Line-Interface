@@ -269,7 +269,8 @@ export default class MonkeyActuator {
                                         task.output = "cheat txin -- cannot get lp tx in, going to refund tx out"
                                         await this.taskExchangeTxOutRefund(task, dealInfo) 
                                     } else if (dealInfo.step == 4) {
-                                        task.output = "relay tx out confirm - cannot get transfer out confirm event from relay at task timeout" 
+                                        task.output = "relay tx out confirm - cannot get transfer out confirm event from relay at task timeout -- going to refund tx out" 
+                                        await this.taskExchangeTxOutRefund(task, dealInfo) 
                                     }
                                     await this.callWebHookFailed(task, relay, dealInfo)
                                 } else if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
@@ -938,7 +939,7 @@ export default class MonkeyActuator {
         const resp = await Business.complainByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network)
         if (resp === true) {
             task.output = `${task.title} -- complaint -- submitted successfully` 
-            task.title = `${task.title} -- complaint -- com submitted successfully`
+            task.title = `${task.title} -- complaint -- submitted successfully`
         } else {
             task.output = `${task.title} -- complaint -- failed to submit due to ${resp}`
             task.title = `${task.title} -- complaint -- failed to submit due to ${resp}`
