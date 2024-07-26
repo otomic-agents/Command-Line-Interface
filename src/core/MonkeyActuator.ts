@@ -481,6 +481,7 @@ export default class MonkeyActuator {
                 bridge: dealInfo.business?.swap_asset_information.quote.quote_base.bridge.bridge_name,
                 amount: dealInfo.business?.swap_asset_information.amount,
                 type: `test flow: ${dealInfo.type}`,
+                businessHash: dealInfo.business?.hash,
                 swapDetail: objectToString(rest2)
             })
 
@@ -501,6 +502,7 @@ export default class MonkeyActuator {
                 bridge: dealInfo.business?.swap_asset_information.quote.quote_base.bridge.bridge_name,
                 amount: dealInfo.business?.swap_asset_information.amount,
                 type: `test flow: ${dealInfo.type}`,
+                businessHash: dealInfo.business?.hash,
                 messageTitle: task.title,
                 messageData:  task.output,
                 swapDetail: objectToString(rest2)
@@ -849,10 +851,10 @@ export default class MonkeyActuator {
 
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
             const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
-            task.output= `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
+            task.output= `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
             const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, dealInfo.uuid!)
-            task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+            task.output = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
         }
 
         await delay(50)
