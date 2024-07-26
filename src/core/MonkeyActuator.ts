@@ -5,6 +5,7 @@ import { Listr, delay, PRESET_TIMESTAMP } from 'listr2';
 import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, business as Business, ResponseTransferOut, ResponseSolana } from 'otmoic-software-development-kit';
 import Bignumber from 'bignumber.js'
 import needle from 'needle'
+import retry from 'async-retry';
 import { objectToString } from '../utils/flattenObject';
 
 function getRandomNumberInRange(n: number, m: number): number {
@@ -737,9 +738,18 @@ export default class MonkeyActuator {
         while (succeed == false) {
 
             await delay(500)
-            const resp = await relay.getBusiness(dealInfo.business.hash)
-            task.output = `waiting... step: ${resp.step}`
-            succeed = resp.step >= 3
+            await retry(
+                async () => {
+                    const resp = await relay.getBusiness(dealInfo.business!.hash)
+                    task.output = `waiting... step: ${resp.step}`
+                    succeed = resp.step >= 3
+                },{
+                    retries: 5,
+                    onRetry: (error, attempt) => {
+                        console.log(`retry ${attempt} -- get error -- ${error}`);
+                    },
+                }
+            )
             if (succeed) {
 
                 //get business data and show txhash
@@ -829,9 +839,18 @@ export default class MonkeyActuator {
         while (succeed == false) {
 
             await delay(500)
-            const resp = await relay.getBusiness(dealInfo.business.hash)
-            task.output = `waiting... step: ${resp.step}`
-            succeed = resp.step >= 5
+            await retry(
+                async () => {
+                    const resp = await relay.getBusiness(dealInfo.business!.hash)
+                    task.output = `waiting... step: ${resp.step}`
+                    succeed = resp.step >= 5
+                },{
+                    retries: 5,
+                    onRetry: (error, attempt) => {
+                        console.log(`retry ${attempt} -- get error -- ${error}`);
+                    },
+                }
+            )
             if (succeed) {
                 //get business data and show txhash
                 const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
@@ -855,9 +874,18 @@ export default class MonkeyActuator {
         while (succeed == false) {
 
             await delay(500)
-            const resp = await relay.getBusiness(dealInfo.business.hash)
-            task.output = `waiting... relay tx out confirm: ${resp.transfer_out_confirm_id}`
-            succeed = resp.transfer_out_confirm_id > 0    
+            await retry(
+                async () => {
+                    const resp = await relay.getBusiness(dealInfo.business!.hash)
+                    task.output = `waiting... relay tx out confirm: ${resp.transfer_out_confirm_id}`
+                    succeed = resp.transfer_out_confirm_id > 0
+                },{
+                    retries: 5,
+                    onRetry: (error, attempt) => {
+                        console.log(`retry ${attempt} -- get error -- ${error}`);
+                    },
+                }
+            )
             if (succeed) {
                 //get business data and show txhash
                 const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
@@ -914,9 +942,18 @@ export default class MonkeyActuator {
         while (succeed == false) {
 
             await delay(500)
-            const resp = await relay.getBusiness(dealInfo.business.hash)
-            task.output = `waiting... step: ${resp.step}`
-            succeed = resp.step >= 7
+            await retry(
+                async () => {
+                    const resp = await relay.getBusiness(dealInfo.business!.hash)
+                    task.output = `waiting... step: ${resp.step}`
+                    succeed = resp.step >= 7
+                },{
+                    retries: 5,
+                    onRetry: (error, attempt) => {
+                        console.log(`retry ${attempt} -- get error -- ${error}`);
+                    },
+                }
+            )
             if (succeed) {
                 //get business data and show txhash
                 const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
