@@ -950,6 +950,10 @@ export default class MonkeyActuator {
             task.output = `can refund: ${canDo}, now: ${Date.now()}, time lock: ${(dealInfo.business.swap_asset_information.agreement_reached_time + dealInfo.business.swap_asset_information.step_time_lock * 7) * 1000 + 10 * 1000}`
         }
 
+        console.log(`refund debug: dealInfo.business`, dealInfo.business)
+        console.log(`refund debug: dealInfo.business.swap_asset_information`, dealInfo.business.swap_asset_information)
+        console.log(`refund debug: dealInfo.business.swap_asset_information.quote.quote_base`, dealInfo.business.swap_asset_information.quote.quote_base)
+
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
             const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
             task.output = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
