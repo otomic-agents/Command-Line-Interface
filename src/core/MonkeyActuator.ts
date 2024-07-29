@@ -763,9 +763,11 @@ export default class MonkeyActuator {
 
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
             const resp = await Business.transferOutByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
+            task.output = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
             task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
             const resp = await Business.transferOutByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc)
+            task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
             task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
             dealInfo.uuid = (resp as ResponseSolana).uuid
         }
