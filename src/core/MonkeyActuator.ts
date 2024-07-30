@@ -728,8 +728,8 @@ export default class MonkeyActuator {
 
         dealInfo.business = await relay.swap(dealInfo.quote, dealInfo.signData.signData, dealInfo.signData.signed)
 
-        console.log(`refund debug: dealInfo.business`, dealInfo.business)
-        console.log(`refund debug: dealInfo.business.swap_asset_information.quote.quote_base`, dealInfo.business.swap_asset_information.quote.quote_base)
+        console.log(`dealInfo.business`, dealInfo.business)
+        console.log(`dealInfo.business.swap_asset_information.quote.quote_base`, dealInfo.business.swap_asset_information.quote.quote_base)
 
         if (dealInfo.business == undefined) {
             throw new Error('failed to get business');
