@@ -728,16 +728,15 @@ export default class MonkeyActuator {
 
         dealInfo.business = await relay.swap(dealInfo.quote, dealInfo.signData.signData, dealInfo.signData.signed)
 
-        console.log(`dealInfo.business`, dealInfo.business)
-        console.log(`dealInfo.business.swap_asset_information.quote.quote_base`, dealInfo.business.swap_asset_information.quote.quote_base)
-
         if (dealInfo.business == undefined) {
             throw new Error('failed to get business');
         }
-
+        
         if (dealInfo.business.locked == false) {
             throw new Error(`lp lock failed: ${JSON.stringify(dealInfo.business.hash)}`);
         }
+        console.log(`dealInfo.business`, dealInfo.business)
+        console.log(`dealInfo.business.swap_asset_information.quote.quote_base`, dealInfo.business.swap_asset_information.quote.quote_base)
 
         task.title = `${task.title} -- (bidid:${dealInfo.business.hash})`
 
