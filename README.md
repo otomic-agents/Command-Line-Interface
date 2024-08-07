@@ -86,28 +86,27 @@ describe the command here
 
 ```
 USAGE
-  $ otmoiccli monkey [-i <value>] [-r <value>] [-a <value>] [-b <value>] [-p <value>] [-s <value>] [-w
-    <value>] [-t <value>] [-C <value>] [-l <value>] [-n <value>] [-c <value>] [-T <value>] [-S <value>]
+  $ otmoiccli monkey [-i <value>] [-r <value>] [-a <value>] [-b <value>] [-p <value>] [-s <value>] [-w <value>] [-t
+    <value>] [-C <value>] [-l <value>] [-n <value>] [-c <value>] [-T <value>] [-S <>]
 
 FLAGS
-  -C, --complaint=<value>         do complaint, enter [true] or [false], if "type" is not "succeed", complaint can be
-                                  run
-  -S, --solanaTo=<value>          your solana address for receiving token
-  -T, --to=<value>                your evm address for receiving token
-  -a, --amount=<value>            the per mille (num over 1000) of srctokens exchanged (base of balance) in each test,
-                                  random within a specific range, in the format of [min]-[max]
-  -b, --bridge=<value>            the bridges to be tested are separated by commas. If it is empty, there is no limit.
-  -c, --chainRpc=<value>          rpc config json, like: { bsc: "<RPC_BSC>" }
-  -i, --interval=<value>          the interval between the two monkeys' departures is random within a certain range, in
-                                  the format of [min]-[max]
-  -l, --lp=<value>                the lp name to be tested. no restriction if empty.
-  -n, --network=<value>           network: mainnet / testnet
-  -p, --privateKey=<value>        evm private key used during testing
-  -r, --relay=<value>             relay url
-  -s, --solanaPrivateKey=<value>  solana private key used during testing
-  -t, --type=<value>              the test type, separated by commas, [succeed] or [refund] or [cheat amount] or [cheat
-                                  address] or [cheat txin]
-  -w, --webhook=<value>           webhook address for receiving execution reports
+  -C, --complaint=<value>           do complaint, enter [true] or [false], if "type" is not "succeed", complaint can be run
+  -a, --amount=<value>              the percentage of srctokens exchanged (base of balance) in each test, random within a
+                                    specific range, in the format of [min]-[max]
+  -b, --bridge=<value>              the bridges to be tested are separated by commas. If it is empty, there is no limit.
+  -c, --chainRpc=<value>            rpc config json, like: { bsc: "<RPC_BSC>" }
+  -i, --interval=<value>            the interval between the two monkeys' departures is random within a certain range, in the
+                                    format of [min]-[max]
+  -l, --lp=<value>                  the lp name to be tested. no restriction if empty.
+  -n, --network=<value>             network: main / test
+  -p, --privateKey=<value>          evm private key used during testing
+  -s, --solanaPrivateKey=<value>    solana private key used during testing
+  -r, --relay=<value>               relay url
+  -t, --type=<value>                the test type, separated by commas, [succeed] or [refund] or [cheat amount] or [cheat
+                                    address] or [cheat txin]
+  -w, --webhook=<value>             webhook address for receiving execution reports
+  -T, --to=<value>                  your evm address for receiving token
+  -S, --solanaTo=<value>            your solana address for receiving token
 
 DESCRIPTION
   describe the command here

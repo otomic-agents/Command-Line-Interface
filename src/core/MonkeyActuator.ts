@@ -2,17 +2,61 @@ import { prompt } from 'enquirer';
 import { ethers } from "ethers";
 import { Keypair } from '@solana/web3.js';
 import { Listr, delay, PRESET_TIMESTAMP } from 'listr2';
-import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, business as Business, ResponseTransferOut, ResponseSolana } from 'otmoic-software-development-kit';
+import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, business as Business, ResponseTransferOut, ResponseSolana, Business as BusinessType, BusinessFullData } from 'otmoic-software-development-kit';
 import Bignumber from 'bignumber.js'
 import needle from 'needle'
+import retry from 'async-retry';
 import { objectToString } from '../utils/flattenObject';
 
 function getRandomNumberInRange(n: number, m: number): number {
     return Math.floor(Math.random() * (m - n + 1) + n);
 }
 
+async function getBusinessRetry(relay: Relay, businessHash: string) {
+    return new Promise<BusinessType>((resolve, reject) => {
+        retry(
+            async () => {
+                let business = await relay.getBusiness(businessHash)
+                resolve(business)
+            }, {
+            retries: 5,
+            onRetry: (error, attempt) => {
+                console.log(`retry ${attempt} -- get error -- ${error}`);
+            },
+        }
+        )
+    })
+}
+
+async function getBusinessFullRetry(relay: Relay, businessHash: string) {
+    return new Promise<BusinessFullData>((resolve, reject) => {
+        retry(
+            async () => {
+                let businessFull = await relay.getBusinessFull(businessHash)
+                resolve(businessFull)
+            }, {
+            retries: 5,
+            onRetry: (error, attempt) => {
+                console.log(`retry ${attempt} -- get error -- ${error}`);
+            },
+        }
+        )
+    })
+}
+
+enum Step {
+    WaitTransferOut = 1,
+    UserTransferOut = 2,
+    LpTransferIn = 3,
+    UserConfirmOut = 4,
+    LpConfirmIn = 5,
+    UserRefundOut = 6,
+    LpRefundIn = 7,
+    Complaint = 8,
+}
+
 interface Config {
-    
+
     intervalMin: number
 
     intervalMax: number
@@ -50,6 +94,8 @@ interface Config {
     lp: string
 
     network: string
+
+    debug: boolean
 }
 
 interface DealInfo {
@@ -71,11 +117,13 @@ interface DealInfo {
     dstRpc: string | undefined
 
     signData: {
-        signData: SignData, 
+        signData: SignData,
         signed: string
     } | undefined
 
     uuid: string | undefined
+
+    step: number | undefined
 }
 
 export default class MonkeyActuator {
@@ -110,7 +158,7 @@ export default class MonkeyActuator {
 
     solanaReceivingAddress: string | undefined
 
-    taskList: Listr<any, "simple", "simple"> | undefined
+    taskList: Listr<any, "simple" | "default", "simple"> | undefined
 
     config: Config = {
         intervalMin: 0,
@@ -130,13 +178,14 @@ export default class MonkeyActuator {
         complaint: [],
         lp: '',
         network: '',
-        rpcs: {}
+        rpcs: {},
+        debug: false
     }
 
-    constructor(interval: string | undefined, relay: string | undefined, amount: string | undefined, 
-        bridge: string | undefined, privateKey: string | undefined, solanaPrivateKey: string | undefined, webhook: string | undefined, 
-        type: string | undefined, complaint: string | undefined, lp: string | undefined, 
-        network: string | undefined, rpcs: string | undefined, receivingAddress: string | undefined, solanaReceivingAddress: string | undefined) {
+    constructor(interval: string | undefined, relay: string | undefined, amount: string | undefined,
+        bridge: string | undefined, privateKey: string | undefined, solanaPrivateKey: string | undefined, webhook: string | undefined,
+        type: string | undefined, complaint: string | undefined, lp: string | undefined,
+        network: string | undefined, rpcs: string | undefined, receivingAddress: string | undefined, solanaReceivingAddress: string | undefined, debug: string | undefined) {
 
         this.interval = interval
         this.relay = relay
@@ -152,6 +201,7 @@ export default class MonkeyActuator {
         this.rpcs = rpcs == undefined ? {} : JSON.parse(rpcs)
         this.receivingAddress = receivingAddress
         this.solanaReceivingAddress = solanaReceivingAddress
+        this.config.debug = debug ? true : false
     }
 
     run = () => new Promise<void>(async (resolve, reject) => {
@@ -191,6 +241,49 @@ export default class MonkeyActuator {
             dstRpc: undefined,
             signData: undefined,
             uuid: undefined,
+            step: undefined
+        }
+
+        let concurrentTaskOption: any
+        let orderedTaskOption: any
+        if (this.config.debug) {
+            concurrentTaskOption = {
+                concurrent: true,
+                renderer: 'simple',
+                rendererOptions: {
+                    timestamp: PRESET_TIMESTAMP
+                },
+                exitOnError: true
+            }
+            orderedTaskOption = {
+                concurrent: false,
+                renderer: 'simple',
+                rendererOptions: {
+                    timestamp: PRESET_TIMESTAMP
+                },
+                exitOnError: true
+            }
+        } else {
+            concurrentTaskOption = {
+                renderer: 'default',
+                rendererOptions: {
+                    collapseSubtasks: false
+                },
+                exitOnError: true,
+                concurrent: true,
+                showErrorMessage: true,
+                collapseErrors: true
+            }
+            orderedTaskOption = {
+                renderer: 'default',
+                rendererOptions: {
+                    collapseSubtasks: false
+                },
+                exitOnError: true,
+                concurrent: false,
+                showErrorMessage: true,
+                collapseErrors: true
+            }
         }
 
         try {
@@ -198,7 +291,7 @@ export default class MonkeyActuator {
                 {
                     title: 'check timeout',
                     enabled: true,
-                    task: async(_: any, task: any): Promise<void> => {
+                    task: async (_: any, task: any): Promise<void> => {
 
                         const interval = getRandomNumberInRange(this.config.intervalMin, this.config.intervalMax)
 
@@ -209,24 +302,34 @@ export default class MonkeyActuator {
                         }
 
                         if (this.taskList != undefined) {
-                            if (dealInfo.type?.startsWith('cheat')) {
 
-                                if (dealInfo.complaint == true) {
-                                    await this.taskExchangeComplaint(task, dealInfo)
-                                }
-
-                                if (dealInfo.type == 'cheat txin') {
-                                    task.output = "relay tx out confirm - cannot get transfer out confirm event from relay at task timeout" 
-                                    await this.callWebHookFailed(task, relay, dealInfo)
-                                } else if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
-                                    await this.taskExchangeTxOutRefund(task, dealInfo)
-                                    await this.callWebHookSucceed(task, relay, dealInfo)
-                                }
+                            if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
+                                await this.taskExchangeTxOutRefund(task, dealInfo)
+                                await this.callWebHookSucceed(task, relay, dealInfo)
                             } else {
+
+                                if (dealInfo.step == Step.UserTransferOut) {
+                                    task.output = `transfer out is failed to on chain`
+                                }
+    
+                                if (dealInfo.step == Step.LpTransferIn) {
+                                    task.output = "cannot get lp tx in, going to refund tx out"
+                                    await this.taskExchangeTxOutRefund(task, dealInfo)
+                                }
+    
+                                if (dealInfo.type == 'cheat txin' && dealInfo.step == Step.LpConfirmIn) {
+                                    task.output = "relay tx out confirm - cannot get transfer out confirm event from relay at task timeout -- going to refund tx out"
+                                    await this.taskExchangeTxOutRefund(task, dealInfo)
+                                }   
+    
                                 await this.callWebHookFailed(task, relay, dealInfo)
                             }
+
+                            if (dealInfo.type?.startsWith('cheat') && dealInfo.complaint == true) {
+                                await this.taskExchangeComplaint(task, dealInfo)
+                            }
                         }
-                        
+
                         this.taskList = undefined
                         throw new Error("tasks finished")
                     },
@@ -238,43 +341,43 @@ export default class MonkeyActuator {
                         {
                             title: 'random bridge',
                             enabled: true,
-                            task: async(_: any, task: any): Promise<void> => {
-                                
+                            task: async (_: any, task: any): Promise<void> => {
+
                                 let finished = false
                                 this.taskRandomBridge(task, relay, dealInfo)
                                     .then(() => finished = true)
                                 while (finished == false) {
                                     await delay(100)
                                 }
-                                
+
                             }
                         },
                         {
                             title: 'random deal',
                             enabled: true,
-                            task: async(_: any, task: any): Promise<void> => {
-                                  
+                            task: async (_: any, task: any): Promise<void> => {
+
                                 let finished = false
                                 this.taskRandomDeal(task, dealInfo)
                                     .then(() => finished = true)
                                 while (finished == false) {
                                     await delay(100)
                                 }
-        
+
                             }
                         },
                         {
                             title: 'submit deal',
                             enabled: true,
-                            task: async(_: any, task: any): Promise<void> => {
-                                
+                            task: async (_: any, task: any): Promise<void> => {
+
                                 let finished = false
                                 this.taskSubmitDeal(task, relay, dealInfo)
                                     .then(() => finished = true)
                                 while (finished == false) {
                                     await delay(100)
                                 }
-                                
+
                             }
                         },
                         {
@@ -284,144 +387,145 @@ export default class MonkeyActuator {
                                 {
                                     title: 'tx out',
                                     enable: true,
-                                    task: async(_: any, task: any): Promise<void> => {               
-        
+                                    task: async (_: any, task: any): Promise<void> => {
+                                        dealInfo.step = Step.UserTransferOut
                                         let finished = false
-                                        this.taskExchangeTxOut(task, dealInfo)
+                                        this.taskExchangeTxOut(task, relay, dealInfo)
                                             .then(() => finished = true)
                                         while (finished == false) {
                                             await delay(100)
                                         }
-        
+
                                     }
                                 },
                                 {
                                     title: 'tx in',
                                     enable: true,
-                                    task: async(_: any, task: any): Promise<void> => {
-                                        
+                                    task: async (_: any, task: any): Promise<void> => {
+                                        dealInfo.step = Step.LpTransferIn
                                         let finished = false
                                         this.taskExchangeTxIn(task, relay, dealInfo)
                                             .then(() => finished = true)
                                         while (finished == false) {
                                             await delay(100)
                                         }
-        
+
                                     }
                                 },
                                 {
                                     title: 'tx out confirm',
                                     enable: true,
-                                    task: async(_: any, task: any): Promise<void> => {
-                                        
+                                    task: async (_: any, task: any): Promise<void> => {
+                                        dealInfo.step = Step.UserConfirmOut
                                         if (dealInfo.type == 'succeed') {
-                                            
+
                                             let finished = false
                                             this.taskExchangeTxOutCfm(task, dealInfo)
                                                 .then(() => finished = true)
-            
+
                                             while (finished == false) {
                                                 await delay(100)
                                             }
                                         } else {
 
                                             if (dealInfo.type == 'cheat txin') {
-                                                
-        
+
+
                                                 let finished = false
                                                 this.cheatExchangeTxInCfm(task, relay, dealInfo)
                                                     .then(() => finished = true)
-                
+
                                                 while (finished == false) {
                                                     await delay(100)
                                                 }
                                             } else {
-                                                task.output = `${task.title} -- type ${dealInfo.type} skip this task`
+                                                task.title = `${task.title} -- type ${dealInfo.type} skip this task`
                                             }
-                                            
-                                        }  
+
+                                        }
                                     }
                                 },
                                 {
                                     title: 'tx in confirm',
                                     enable: true,
-                                    task: async(_: any, task: any): Promise<void> => {
-                                        
+                                    task: async (_: any, task: any): Promise<void> => {
+                                        dealInfo.step = Step.LpConfirmIn
                                         if (dealInfo.type == 'succeed') {
-                                            
-        
+
+
                                             let finished = false
                                             this.taskExchangeTxInCfm(task, relay, dealInfo)
                                                 .then(() => finished = true)
-            
+
                                             while (finished == false) {
                                                 await delay(100)
                                             }
                                         } else if (dealInfo.type == 'cheat txin') {
-                                            
-        
+
+
                                             let finished = false
                                             this.taskExchangeRelayTxOutCfm(task, relay, dealInfo)
                                                 .then(() => finished = true)
-            
+
                                             while (finished == false) {
                                                 await delay(100)
                                             }
                                         } else {
-                                            task.output = `${task.title} -- type ${dealInfo.type} skip this task`
+                                            task.title = `${task.title} -- type ${dealInfo.type} skip this task`
                                         }
-                                        
-        
+
+
                                     }
                                 },
                                 {
                                     title: 'tx out refund',
                                     enable: true,
-                                    task: async(_: any, task: any): Promise<void> => {
+                                    task: async (_: any, task: any): Promise<void> => {
+                                        dealInfo.step = Step.UserRefundOut
                                         if (dealInfo.type == 'refund' || dealInfo.type == 'cheat address' || dealInfo.type == 'cheat amount') {
-        
+
                                             let finished = false
                                             this.taskExchangeTxOutRefund(task, dealInfo)
                                                 .then(() => finished = true)
-            
+
                                             while (finished == false) {
                                                 await delay(100)
                                             }
                                         } else {
-                                            task.output = `${task.title} -- type ${dealInfo.type} skip this task`
+                                            task.title = `${task.title} -- type ${dealInfo.type} skip this task`
                                         }
                                     }
                                 },
                                 {
                                     title: 'tx in refund',
                                     enable: true,
-                                    task: async(_: any, task: any): Promise<void> => {
+                                    task: async (_: any, task: any): Promise<void> => {
+                                        dealInfo.step = Step.LpRefundIn
                                         if (dealInfo.type == 'refund') {
-                                            
-                                            
+
+
                                             let finished = false
                                             this.taskExchangeTxInRefund(task, relay, dealInfo)
                                                 .then(() => finished = true)
-            
+
                                             while (finished == false) {
                                                 await delay(100)
                                             }
                                         } else {
-                                            task.output = `${task.title} -- type ${dealInfo.type} skip this task`
+                                            task.title = `${task.title} -- type ${dealInfo.type} skip this task`
                                         }
-        
+
                                     }
                                 },
                                 {
                                     title: 'complaint',
                                     enable: true,
-                                    task: async(_: any, task: any): Promise<void> => {
-                                        
+                                    task: async (_: any, task: any): Promise<void> => {
+                                        dealInfo.step = Step.Complaint
 
                                         if (dealInfo.type?.startsWith('cheat')) {
 
                                             if (dealInfo.complaint == true) {
-
                                                 await this.taskExchangeComplaint(task, dealInfo)
                                             }
                                         }
@@ -436,32 +540,11 @@ export default class MonkeyActuator {
                                         this.taskList = undefined
                                     }
                                 }
-                            ], {
-                                renderer: 'simple',
-                                rendererOptions: { 
-                                    timestamp: PRESET_TIMESTAMP
-                                },
-                                exitOnError: true,
-                                concurrent: false,
-                            })
+                            ], orderedTaskOption)
                         },
-                    ], {
-                        renderer: 'simple',
-                        rendererOptions: { 
-                            timestamp: PRESET_TIMESTAMP
-                        },
-                        exitOnError: true,
-                        concurrent: false,
-                    })
+                    ], orderedTaskOption)
                 }
-            ], {
-                concurrent: true,
-                renderer: 'simple',
-                rendererOptions: { 
-                    timestamp: PRESET_TIMESTAMP
-                },
-                exitOnError: true
-            })
+            ], concurrentTaskOption)
             this.taskList.run()
         } catch (error) {
             console.error(error)
@@ -477,10 +560,12 @@ export default class MonkeyActuator {
 
             await needle('post', this.config.webhook, {
                 state: 'succeed',
+                network: this.config.network,
                 relay: relay.relayUrl,
                 bridge: dealInfo.business?.swap_asset_information.quote.quote_base.bridge.bridge_name,
                 amount: dealInfo.business?.swap_asset_information.amount,
                 type: `test flow: ${dealInfo.type}`,
+                businessHash: dealInfo.business?.hash,
                 swapDetail: objectToString(rest2)
             })
 
@@ -497,12 +582,14 @@ export default class MonkeyActuator {
 
             await needle('post', this.config.webhook, {
                 state: 'failed',
+                network: this.config.network,
                 relay: relay.relayUrl,
                 bridge: dealInfo.business?.swap_asset_information.quote.quote_base.bridge.bridge_name,
                 amount: dealInfo.business?.swap_asset_information.amount,
                 type: `test flow: ${dealInfo.type}`,
+                businessHash: dealInfo.business?.hash,
                 messageTitle: task.title,
-                messageData:  task.output,
+                messageData: task.output,
                 swapDetail: objectToString(rest2)
             })
 
@@ -535,7 +622,7 @@ export default class MonkeyActuator {
         for (const b of bridgeList) {
             if (await this.isBalanceEnough(b)) {
                 enoughList.push(b)
-            } 
+            }
         }
 
         task.output = `enough balance bridge size: ${bridgeList.length}`
@@ -546,7 +633,7 @@ export default class MonkeyActuator {
 
         dealInfo.bridge = enoughList[getRandomNumberInRange(0, enoughList.length - 1)]
 
-        task.output= `${task.title} --- (${dealInfo.bridge.src_chain_id}-${dealInfo.bridge.src_token}--->${dealInfo.bridge.dst_chain_id}-${dealInfo.bridge.dst_token})`
+        task.title = `${task.title} --- (${dealInfo.bridge.src_chain_id}-${dealInfo.bridge.src_token}--->${dealInfo.bridge.dst_chain_id}-${dealInfo.bridge.dst_token})`
 
         await delay(50)
         resolve()
@@ -558,14 +645,14 @@ export default class MonkeyActuator {
         if (dealInfo.bridge == undefined) {
             throw new Error("bridge is undefined");
         }
-        
+
         const balance = await this.getBalance(dealInfo.bridge)
         dealInfo.amount = balance.times(getRandomNumberInRange(this.config.amountMin, this.config.amountMax)).div(1000).toFixed(6)
 
         dealInfo.type = this.config.type[getRandomNumberInRange(0, this.config.type.length - 1)]
         dealInfo.complaint = 'true' == this.config.complaint[getRandomNumberInRange(0, this.config.complaint.length - 1)]
 
-        task.output = `${task.title} --- (amount:${dealInfo.amount}) --- (type:${dealInfo.type})`
+        task.title = `${task.title} --- (amount:${dealInfo.amount}) --- (type:${dealInfo.type})`
 
         await delay(50)
         resolve()
@@ -577,7 +664,7 @@ export default class MonkeyActuator {
         }
         if (dealInfo.amount == undefined) {
             throw new Error("amount is undefined");
-            
+
         }
 
         let askFinished = false
@@ -634,35 +721,37 @@ export default class MonkeyActuator {
             receivingAddress = this.config.solanaReceivingAddress
         }
 
-        dealInfo.signData = 
+        dealInfo.signData =
             await Business.signQuoteByPrivateKey(
-                this.config.network, dealInfo.quote, privateKey, dealInfo.amount, 0, 
+                this.config.network, dealInfo.quote, privateKey, dealInfo.amount, 0,
                 receivingAddress, undefined, dealInfo.srcRpc, dealInfo.dstRpc)
-        
+
         dealInfo.business = await relay.swap(dealInfo.quote, dealInfo.signData.signData, dealInfo.signData.signed)
 
         if (dealInfo.business == undefined) {
             throw new Error('failed to get business');
         }
-
+        
         if (dealInfo.business.locked == false) {
             throw new Error(`lp lock failed: ${JSON.stringify(dealInfo.business.hash)}`);
         }
+        console.log(`dealInfo.business`, dealInfo.business)
+        console.log(`dealInfo.business.swap_asset_information.quote.quote_base`, dealInfo.business.swap_asset_information.quote.quote_base)
 
-        task.output = `${task.title} -- (bidid:${dealInfo.business.hash})`
+        task.title = `${task.title} -- (bidid:${dealInfo.business.hash})`
 
         await delay(50)
         resolve()
     })
 
-    taskExchangeTxOut = (task: any, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
+    taskExchangeTxOut = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
         task.output = 'sending...'
 
         if (dealInfo.business == undefined) {
             throw new Error("business is undefined");
         }
 
-        if(dealInfo.type == 'cheat amount') {
+        if (dealInfo.type == 'cheat amount') {
             const dArr = dealInfo.business.swap_asset_information.amount.split('.')
             const d = dArr.length == 2 ? [dArr].length : 0
             dealInfo.business.swap_asset_information.amount = new Bignumber(dealInfo.business.swap_asset_information.amount).times(0.8).toFixed(d)
@@ -675,13 +764,26 @@ export default class MonkeyActuator {
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
             const resp = await Business.transferOutByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
             task.output = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
+            task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
             const resp = await Business.transferOutByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc)
             task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+            task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
             dealInfo.uuid = (resp as ResponseSolana).uuid
         }
+        
+        let succeed = false
+        
+        while (succeed == false) {
+            await delay(2000)
+            const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
+            task.output = `waiting... step: ${resp.step}`
+            succeed = resp.step >= Step.UserTransferOut
 
-        await delay(50)
+            if (succeed) {
+                task.output = `transfer out is on chain successfully`
+            }
+        }
         resolve()
     })
 
@@ -695,20 +797,20 @@ export default class MonkeyActuator {
         let succeed = false
 
         while (succeed == false) {
-
-            await delay(500)
-            const resp = await relay.getBusiness(dealInfo.business.hash)
+            await delay(2000)
+            const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
             task.output = `waiting... step: ${resp.step}`
-            succeed = resp.step >= 3
+            succeed = resp.step >= Step.LpTransferIn
+
             if (succeed) {
 
                 //get business data and show txhash
-                const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
+                const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
                 if (businessFull.event_transfer_in && businessFull.event_transfer_in.transfer_info) {
                     if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
-                        task.output = `${task.title} -- lp should not send tx in for the case - ${JSON.parse(businessFull.event_transfer_in.transfer_info).transactionHash}`
+                        task.title = `${task.title} -- lp should not send tx in for the case - ${JSON.parse(businessFull.event_transfer_in.transfer_info).transactionHash}`
                     } else {
-                        task.output = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in.transfer_info).transactionHash}`
+                        task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in.transfer_info).transactionHash}`
                     }
                 } else {
                     throw new Error("getBusinessFull failed to return data with event_transfer_in info")
@@ -728,12 +830,12 @@ export default class MonkeyActuator {
 
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
             const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
-            task.output = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
+            task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
             const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, dealInfo.uuid!)
-            task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+            task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
         }
-        
+
         await delay(50)
         resolve()
     })
@@ -745,7 +847,7 @@ export default class MonkeyActuator {
             throw new Error("business is undefined");
         }
 
-        const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
+        const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
         let sender: string | undefined
         if (businessFull.event_transfer_in && businessFull.event_transfer_in.sender) {
             sender = businessFull.event_transfer_in.sender
@@ -757,9 +859,9 @@ export default class MonkeyActuator {
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'evm') {
 
             const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, sender)
-            task.output = `${task.title} -- user cheat confirm in -- ${(resp as ethers.ContractTransactionResponse).hash}`
+            task.title = `${task.title} -- user cheat confirm in -- ${(resp as ethers.ContractTransactionResponse).hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'solana') {
-            
+
             let uuid: string | undefined
             if (businessFull.event_transfer_in && businessFull.event_transfer_in.transfer_id) {
                 let uuidStr = businessFull.event_transfer_in.transfer_id
@@ -769,9 +871,9 @@ export default class MonkeyActuator {
                 throw new Error("failed to get transfer in uuid")
             }
             const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, sender, uuid)
-            task.output = `${task.title} -- user cheat confirm in -- ${(resp as ResponseSolana).txHash}`
+            task.title = `${task.title} -- user cheat confirm in -- ${(resp as ResponseSolana).txHash}`
         }
-        
+
         await delay(50)
 
         resolve()
@@ -788,15 +890,16 @@ export default class MonkeyActuator {
 
         while (succeed == false) {
 
-            await delay(500)
-            const resp = await relay.getBusiness(dealInfo.business.hash)
+            await delay(2000)
+            const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
             task.output = `waiting... step: ${resp.step}`
-            succeed = resp.step >= 5
+            succeed = resp.step >= Step.LpConfirmIn
+
             if (succeed) {
                 //get business data and show txhash
-                const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
+                const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
                 if (businessFull.event_transfer_in_confirm && businessFull.event_transfer_in_confirm.transfer_info) {
-                    task.output = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_confirm.transfer_info).transactionHash}`
+                    task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_confirm.transfer_info).transactionHash}`
                 }
             }
         }
@@ -805,7 +908,7 @@ export default class MonkeyActuator {
 
     taskExchangeRelayTxOutCfm = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
         task.output = 'relay tx out confirm waiting...'
-        
+
         let succeed = false
 
         if (dealInfo.business == undefined) {
@@ -814,15 +917,17 @@ export default class MonkeyActuator {
 
         while (succeed == false) {
 
-            await delay(500)
-            const resp = await relay.getBusiness(dealInfo.business.hash)
+            await delay(2000)
+
+            const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
             task.output = `waiting... relay tx out confirm: ${resp.transfer_out_confirm_id}`
-            succeed = resp.transfer_out_confirm_id > 0    
+            succeed = resp.transfer_out_confirm_id > 0
+
             if (succeed) {
                 //get business data and show txhash
-                const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
+                const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
                 if (businessFull.event_transfer_out_confirm && businessFull.event_transfer_out_confirm.transfer_info) {
-                    task.output = `${task.title} - relay tx out confirm -- ${JSON.parse(businessFull.event_transfer_out_confirm.transfer_info).transactionHash}`
+                    task.title = `${task.title} - relay tx out confirm -- ${JSON.parse(businessFull.event_transfer_out_confirm.transfer_info).transactionHash}`
                 }
             }
         }
@@ -840,19 +945,21 @@ export default class MonkeyActuator {
 
         let canDo = false
         while (canDo == false) {
-            await delay(1000)
+            await delay(2000)
 
             canDo = Date.now() > ((dealInfo.business.swap_asset_information.agreement_reached_time + dealInfo.business.swap_asset_information.step_time_lock * 7) * 1000 + 10 * 1000)
-            
+
             task.output = `can refund: ${canDo}, now: ${Date.now()}, time lock: ${(dealInfo.business.swap_asset_information.agreement_reached_time + dealInfo.business.swap_asset_information.step_time_lock * 7) * 1000 + 10 * 1000}`
         }
 
         if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
             const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
-            task.output= `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
+            task.output = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
+            task.title = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
         } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
             const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, dealInfo.uuid!)
-            task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+            task.output = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
+            task.title = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
         }
 
         await delay(50)
@@ -871,15 +978,17 @@ export default class MonkeyActuator {
 
         while (succeed == false) {
 
-            await delay(500)
-            const resp = await relay.getBusiness(dealInfo.business.hash)
+            await delay(2000)
+
+            const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
             task.output = `waiting... step: ${resp.step}`
-            succeed = resp.step >= 7
+            succeed = resp.step >= Step.LpRefundIn
+
             if (succeed) {
                 //get business data and show txhash
-                const businessFull = await relay.getBusinessFull(dealInfo.business.hash)
+                const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
                 if (businessFull.event_transfer_in_refund && businessFull.event_transfer_in_refund.transfer_info) {
-                    task.output = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_refund.transfer_info).transactionHash}`
+                    task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_refund.transfer_info).transactionHash}`
                 }
 
             }
@@ -896,9 +1005,11 @@ export default class MonkeyActuator {
 
         const resp = await Business.complainByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network)
         if (resp === true) {
-            task.output = `${task.title} -- submitted successfully`    
+            task.output = `${task.title} -- complaint -- submitted successfully`
+            task.title = `${task.title} -- complaint -- submitted successfully`
         } else {
-            task.output = `${task.title} -- failed to submit due to ${resp}`    
+            task.output = `${task.title} -- complaint -- failed to submit due to ${resp}`
+            task.title = `${task.title} -- complaint -- failed to submit due to ${resp}`
         }
 
         await delay(50)
@@ -908,7 +1019,7 @@ export default class MonkeyActuator {
 
     initNetwork = () => new Promise<void>(async (resolve, reject) => {
         if (this.network == undefined || (this.network != 'mainnet' && this.network != 'testnet')) {
-            const netValue: { value: string} = await prompt({
+            const netValue: { value: string } = await prompt({
                 type: 'select',
                 name: 'value',
                 message: 'Pick network',
@@ -948,14 +1059,14 @@ export default class MonkeyActuator {
 
     initRelay = () => new Promise<void>(async (resolve, reject) => {
         if (this.relay == undefined) {
-            const relayUrlValue: { value: string} = (await prompt({
+            const relayUrlValue: { value: string } = (await prompt({
                 type: 'input',
                 name: 'value',
                 message: 'Enter relay url',
             }))
             this.relay = relayUrlValue.value
         }
-        this.config.relayUrl =  this.relay
+        this.config.relayUrl = this.relay
         console.log('relay url:', this.config.relayUrl)
 
         resolve()
@@ -964,33 +1075,33 @@ export default class MonkeyActuator {
     initChainRpc = async () => {
         if (Object.keys(this.rpcs).length == 0) {
             const configRpc: { value: boolean } = await prompt({
-              type: 'toggle',
-              name: 'value',
-              message: 'Do you want to customize the rpc address?',
-              enabled: 'Yes',
-              disabled: 'No'
+                type: 'toggle',
+                name: 'value',
+                message: 'Do you want to customize the rpc address?',
+                enabled: 'Yes',
+                disabled: 'No'
             });
             console.log('configRpc', configRpc.value)
             if (configRpc.value == true) {
-              const rpcsValue: any = await prompt({
-                name: 'ConfigRPSC',
-                type: 'snippet',
-                message: 'enter your rpc url',
-                required: true,
-                template: `{
+                const rpcsValue: any = await prompt({
+                    name: 'ConfigRPSC',
+                    type: 'snippet',
+                    message: 'enter your rpc url',
+                    required: true,
+                    template: `{
                   bsc: #{bsc_rpc_url},
                   opt: #{opt_rpc_url}
                 }`
-              })
-      
-              
-              console.log('rpcsValue', rpcsValue)
-              this.rpcs = {
-                bsc: rpcsValue.ConfigRPSC.values.bsc_rpc_url,
-                opt: rpcsValue.ConfigRPSC.values.opt_rpc_url
-              }
+                })
+
+
+                console.log('rpcsValue', rpcsValue)
+                this.rpcs = {
+                    bsc: rpcsValue.ConfigRPSC.values.bsc_rpc_url,
+                    opt: rpcsValue.ConfigRPSC.values.opt_rpc_url
+                }
             }
-      
+
         }
         this.config.rpcs = this.rpcs
         console.log('rpcsValue', this.config.rpcs)
@@ -1026,10 +1137,10 @@ export default class MonkeyActuator {
             } else {
                 this.config.bridges = this.bridge.split(',')
             }
-            
+
             console.log('bridge range ', this.config.bridges)
         } else {
-            const bridgeValue: {value: string} = (await prompt({
+            const bridgeValue: { value: string } = (await prompt({
                 type: 'input',
                 name: 'value',
                 message: 'please enter range of bridge, empty is unrestricted'
@@ -1041,14 +1152,14 @@ export default class MonkeyActuator {
             } else {
                 console.log('unrestricted bridge range')
             }
-            
+
         }
         resolve()
     })
 
     initPrivateKey = () => new Promise<void>(async (resolve, reject) => {
         if (this.privateKey == undefined) {
-            const pvKeyValue: {value: string} = (await prompt({
+            const pvKeyValue: { value: string } = (await prompt({
                 type: 'input',
                 name: 'value',
                 message: 'please enter your evm private key for monkey test'
@@ -1066,7 +1177,7 @@ export default class MonkeyActuator {
 
     initSolanaPrivateKey = () => new Promise<void>(async (resolve, reject) => {
         if (this.solanaPrivateKey == undefined) {
-            const pvKeyValue: {value: string} = (await prompt({
+            const pvKeyValue: { value: string } = (await prompt({
                 type: 'input',
                 name: 'value',
                 message: 'please enter your solana private key for monkey test'
@@ -1075,7 +1186,7 @@ export default class MonkeyActuator {
         }
         this.config.solanaPrivateKey = this.solanaPrivateKey
 
-        const wallet  = Keypair.fromSecretKey(Uint8Array.from(Buffer.from(this.config.solanaPrivateKey.startsWith('0x') ? this.config.solanaPrivateKey.slice(2) : this.config.solanaPrivateKey, 'hex')))
+        const wallet = Keypair.fromSecretKey(Uint8Array.from(Buffer.from(this.config.solanaPrivateKey.startsWith('0x') ? this.config.solanaPrivateKey.slice(2) : this.config.solanaPrivateKey, 'hex')))
 
         this.config.solanaSendingAddress = wallet.publicKey.toBase58()
 
@@ -1085,7 +1196,7 @@ export default class MonkeyActuator {
 
     initReceivingAddress = () => new Promise<void>(async (resolve, reject) => {
         if (this.receivingAddress == undefined) {
-            const keyType: { value: string} = await prompt({
+            const keyType: { value: string } = await prompt({
                 type: 'select',
                 name: 'value',
                 message: 'evm receiving address is ?',
@@ -1101,7 +1212,7 @@ export default class MonkeyActuator {
             if (keyType.value == 'same as evm test address') {
                 this.receivingAddress = this.config.sendingAddress
             } else {
-                const addressValue: {value: string} = (await prompt({
+                const addressValue: { value: string } = (await prompt({
                     type: 'input',
                     name: 'value',
                     message: "please enter your evm wallet address, for receiving DstToken"
@@ -1115,7 +1226,7 @@ export default class MonkeyActuator {
 
     initSolanaReceivingAddress = () => new Promise<void>(async (resolve, reject) => {
         if (this.solanaReceivingAddress == undefined) {
-            const keyType: { value: string} = await prompt({
+            const keyType: { value: string } = await prompt({
                 type: 'select',
                 name: 'value',
                 message: 'solana receiving address is ?',
@@ -1131,7 +1242,7 @@ export default class MonkeyActuator {
             if (keyType.value == 'same as solana test address') {
                 this.solanaReceivingAddress = this.config.solanaSendingAddress
             } else {
-                const addressValue: {value: string} = (await prompt({
+                const addressValue: { value: string } = (await prompt({
                     type: 'input',
                     name: 'value',
                     message: "please enter your solana wallet address, for receiving DstToken"
@@ -1145,7 +1256,7 @@ export default class MonkeyActuator {
 
     initWebhook = () => new Promise<void>(async (resolve, reject) => {
         if (this.webhook == undefined) {
-            const webhookValue: {value: string} = (await prompt({
+            const webhookValue: { value: string } = (await prompt({
                 type: 'input',
                 name: 'value',
                 message: 'if you want to recevie monkey deal details, enter webhook url'
@@ -1159,16 +1270,16 @@ export default class MonkeyActuator {
 
     initType = () => new Promise<void>(async (resolve, reject) => {
         if (this.type == undefined) {
-            const typeValue: {value: string[]} = await prompt({
+            const typeValue: { value: string[] } = await prompt({
                 type: 'multiselect',
                 name: 'value',
                 message: 'Select the deal status you want to test.',
                 choices: [
-                    { name: 'succeed', value: 'succeed'},
-                    { name: 'refund', value: 'refund'},
-                    { name: 'cheat amount', value: 'cheat amount'},
-                    { name: 'cheat address', value: 'cheat address'},
-                    { name: 'cheat txin', value: 'cheat txin'}
+                    { name: 'succeed', value: 'succeed' },
+                    { name: 'refund', value: 'refund' },
+                    { name: 'cheat amount', value: 'cheat amount' },
+                    { name: 'cheat address', value: 'cheat address' },
+                    { name: 'cheat txin', value: 'cheat txin' }
                 ]
             })
             this.config.type = typeValue.value
@@ -1177,7 +1288,7 @@ export default class MonkeyActuator {
         }
 
         for (const iterator of this.config.type) {
-            if(iterator != 'succeed' && iterator != 'refund' && iterator != 'cheat amount' 
+            if (iterator != 'succeed' && iterator != 'refund' && iterator != 'cheat amount'
                 && iterator != 'cheat address' && iterator != 'cheat txin'
             ) {
                 throw new Error(`unknow type: ${iterator}`);
@@ -1186,16 +1297,16 @@ export default class MonkeyActuator {
         console.log(`type:`, this.config.type)
 
         if (this.complaint == undefined) {
-            const complaintValue: {value: string[]} = await prompt({
+            const complaintValue: { value: string[] } = await prompt({
                 type: 'multiselect',
                 name: 'value',
                 message: 'Select the deal complaint you want to test.',
                 choices: [
-                    { name: 'true', value: 'true'},
-                    { name: 'false', value: 'false'}
+                    { name: 'true', value: 'true' },
+                    { name: 'false', value: 'false' }
                 ]
             })
-            this.config.complaint = complaintValue.value 
+            this.config.complaint = complaintValue.value
         } else {
             this.config.complaint = this.complaint.split(',')
         }
@@ -1206,7 +1317,7 @@ export default class MonkeyActuator {
 
     initLP = () => new Promise<void>(async (resolve, reject) => {
         if (this.lp == undefined) {
-            const lpValue: {value: string} = (await prompt({
+            const lpValue: { value: string } = (await prompt({
                 type: 'input',
                 name: 'value',
                 message: 'enter lp name for test, empty is unrestricted'
@@ -1229,7 +1340,7 @@ export default class MonkeyActuator {
         } else if (utils.GetChainType(bridge.src_chain_id) == 'solana') {
             address = this.config.solanaSendingAddress
         }
-        const balance = await assistive.GetBalance(bridge, address, this.config.network, 
+        const balance = await assistive.GetBalance(bridge, address, this.config.network,
             this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()])
         if (parseFloat(balance) > 0) {
             resolve(true)
@@ -1245,7 +1356,7 @@ export default class MonkeyActuator {
         } else if (utils.GetChainType(bridge.src_chain_id) == 'solana') {
             address = this.config.solanaSendingAddress
         }
-        const balance = await assistive.GetBalance(bridge, address, this.config.network, 
+        const balance = await assistive.GetBalance(bridge, address, this.config.network,
             this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()])
         resolve(new Bignumber(balance))
     })
