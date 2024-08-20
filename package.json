@@ -18,7 +18,7 @@
     "level": "^8.0.1",
     "listr2": "^8.2.1",
     "needle": "^3.3.1",
-    "otmoic-software-development-kit": "^0.0.41",
+    "otmoic-software-development-kit": "^0.0.42",
     "puppeteer": "^22.10.0"
   },
   "devDependencies": {
