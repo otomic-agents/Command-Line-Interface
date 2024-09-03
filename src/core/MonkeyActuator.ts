@@ -1,5 +1,5 @@
 import { prompt } from 'enquirer';
-import { ethers } from "ethers";
+import { ethers, ZeroAddress } from "ethers";
 import { Keypair } from '@solana/web3.js';
 import { Listr, delay, PRESET_TIMESTAMP } from 'listr2';
 import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, business as Business, ResponseTransferOut, ResponseSolana, Business as BusinessType, BusinessFullData } from 'otmoic-software-development-kit';
@@ -647,7 +647,11 @@ export default class MonkeyActuator {
         }
 
         const balance = await this.getBalance(dealInfo.bridge)
-        dealInfo.amount = balance.times(getRandomNumberInRange(this.config.amountMin, this.config.amountMax)).div(1000).toFixed(6)
+        if (dealInfo.bridge.src_token == ZeroAddress) {
+            this.config.amountMin = 800
+            this.config.amountMax = 800
+        }
+        dealInfo.amount = balance.times(getRandomNumberInRange(this.config.amountMin, this.config.amountMax)).div(1000).toFixed(6, Bignumber.ROUND_DOWN)
 
         dealInfo.type = this.config.type[getRandomNumberInRange(0, this.config.type.length - 1)]
         dealInfo.complaint = 'true' == this.config.complaint[getRandomNumberInRange(0, this.config.complaint.length - 1)]
@@ -690,7 +694,7 @@ export default class MonkeyActuator {
         })
 
         while (askFinished == false) {
-            if (Date.now() - askTime > 1000 * 60 * 5) {
+            if (Date.now() - askTime > 1000 * 60 * 3) {
                 throw new Error("get quote failed");
             }
             await delay(500)
