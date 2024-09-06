@@ -20,7 +20,7 @@ while true; do
 
     current_time=$(date +%s)
 
-    if [ $current_time -ge $start_time ] && [ $current_time -lt $end_time ]; then
+    if [ $current_time -ge $work_start_time ] && [ $current_time -lt $work_end_time ]; then
 
         current_datetime=$(date +"%Y-%m-%d_%H%M%S")
         log_file="${log_directory}/${current_datetime}.log"
