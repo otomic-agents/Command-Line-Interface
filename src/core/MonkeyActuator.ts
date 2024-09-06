@@ -422,6 +422,12 @@ export default class MonkeyActuator {
                                             let finished = false
                                             this.taskExchangeTxOutCfm(task, dealInfo)
                                                 .then(() => finished = true)
+                                                .catch((err) => {
+                                                    this.taskExchangeTxOutRefund(task, dealInfo)
+                                                    .then(() => {
+                                                        throw err;
+                                                    })
+                                                })
 
                                             while (finished == false) {
                                                 await delay(100)
