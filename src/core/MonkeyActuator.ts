@@ -838,16 +838,20 @@ export default class MonkeyActuator {
             throw new Error("business is undefined");
         }
 
-        if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
-            const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
-            task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
-        } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-            const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, dealInfo.uuid!)
-            task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+        try {
+            if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+                const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
+                task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
+            } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
+                const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, dealInfo.uuid!)
+                task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+            }
+            await delay(50)
+            resolve()
+        } catch (err) {
+            reject(err)
         }
 
-        await delay(50)
-        resolve()
     })
 
     cheatExchangeTxInCfm = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
