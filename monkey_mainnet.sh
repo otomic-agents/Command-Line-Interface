@@ -12,17 +12,21 @@ get_timestamp() {
   date -d "$1" +%s
 }
 
-# Set start and end times
-break_start_time=$(get_timestamp "$current_date 7:00:00")  # 3:00 PM +8
-break_end_time=$(get_timestamp "$current_date 8:00:00")    # 4:00 PM +8
-
 while true; do
 
+    current_date=$(date +"%Y-%m-%d")
     current_time=$(date +%s)
 
+     # Set break start and end times for today
+    break_start_time=$(get_timestamp "$current_date 7:00:00")  # 3:00 PM +8
+    break_end_time=$(get_timestamp "$current_date 8:00:00")    # 4:00 PM +8
+
     if [ $current_time -ge $break_start_time ] && [ $current_time -lt $break_end_time ]; then
-        echo "break time"
-        sleep 60  # Wait for 1 minute before the next iteration
+        echo "$(date +"%Y-%m-%d %H:%M:%S") - Break time"
+        # If we're in the break window, sleep until the end of the break
+        sleep_duration=$((break_end_time - current_time))
+        echo "Sleeping until break ends: $(date -d "@$break_end_time")"
+        sleep $sleep_duration
     else
         current_datetime=$(date +"%Y-%m-%d_%H%M%S")
         log_file="${log_directory}/${current_datetime}.log"
