@@ -700,7 +700,7 @@ export default class MonkeyActuator {
         })
 
         while (askFinished == false) {
-            if (Date.now() - askTime > 1000 * 60 * 1) {
+            if (Date.now() - askTime > 1000 * 30) {
                 throw new Error("get quote failed");
             }
             await delay(500)
