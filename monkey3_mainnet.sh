@@ -1,6 +1,6 @@
 #!/bin/bash
 
-log_directory="./logs/monkey2_mainnet"
+log_directory="./logs/monkey3_mainnet"
 
 if [ ! -d "$log_directory" ]; then
     mkdir -p "$log_directory"
