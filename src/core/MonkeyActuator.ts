@@ -1104,7 +1104,8 @@ export default class MonkeyActuator {
                     required: true,
                     template: `{
                   bsc: #{bsc_rpc_url},
-                  opt: #{opt_rpc_url}
+                  opt: #{opt_rpc_url},
+                  solana: #{solana_rpc_url}
                 }`
                 })
 
@@ -1112,7 +1113,8 @@ export default class MonkeyActuator {
                 console.log('rpcsValue', rpcsValue)
                 this.rpcs = {
                     bsc: rpcsValue.ConfigRPSC.values.bsc_rpc_url,
-                    opt: rpcsValue.ConfigRPSC.values.opt_rpc_url
+                    opt: rpcsValue.ConfigRPSC.values.opt_rpc_url,
+                    solana: rpcsValue.ConfigRPSC.values.solana_rpc_url
                 }
             }
 
