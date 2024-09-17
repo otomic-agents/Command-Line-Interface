@@ -316,6 +316,11 @@ export default class MonkeyActuator {
                                     task.output = "cannot get lp tx in, going to refund tx out"
                                     await this.taskExchangeTxOutRefund(task, dealInfo)
                                 }
+
+                                if (dealInfo.step == Step.UserConfirmOut) {
+                                    task.output = "confirm out is failed on chain, going to refund tx out"
+                                    await this.taskExchangeTxOutRefund(task, dealInfo)
+                                }
     
                                 if (dealInfo.type == 'cheat txin' && dealInfo.step == Step.LpConfirmIn) {
                                     task.output = "relay tx out confirm - cannot get transfer out confirm event from relay at task timeout -- going to refund tx out"
@@ -420,7 +425,7 @@ export default class MonkeyActuator {
                                         if (dealInfo.type == 'succeed') {
 
                                             let finished = false
-                                            this.taskExchangeTxOutCfm(task, dealInfo)
+                                            this.taskExchangeTxOutCfm(task, relay, dealInfo)
                                                 .then(() => finished = true)
                                                 .catch((err) => {
                                                     this.taskExchangeTxOutRefund(task, dealInfo)
@@ -788,7 +793,7 @@ export default class MonkeyActuator {
             await delay(2000)
             const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
             task.output = `waiting... step: ${resp.step}`
-            succeed = resp.step >= Step.UserTransferOut
+            succeed = resp.step == Step.UserTransferOut
 
             if (succeed) {
                 task.output = `transfer out is on chain successfully`
@@ -831,7 +836,7 @@ export default class MonkeyActuator {
         resolve()
     })
 
-    taskExchangeTxOutCfm = (task: any, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
+    taskExchangeTxOutCfm = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
         task.output = 'sending...'
 
         if (dealInfo.business == undefined) {
@@ -846,6 +851,21 @@ export default class MonkeyActuator {
                 const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, dealInfo.uuid!)
                 task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
             }
+
+                    
+            let succeed = false
+            
+            while (succeed == false) {
+                await delay(2000)
+                const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
+                task.output = `waiting... step: ${resp.step}`
+                succeed = resp.step == Step.UserConfirmOut
+
+                if (succeed) {
+                    task.output = `confirm out is on chain successfully`
+                }
+            }
+
             await delay(50)
             resolve()
         } catch (err) {
