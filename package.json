@@ -1,7 +1,7 @@
 {
   "name": "otmoiccli",
   "description": "otmoic-cli has functions such as generating account reports, querying quotes, and making exchanges.",
-  "version": "0.0.0",
+  "version": "0.0.6",
   "author": "bytetrade",
   "bin": {
     "otmoiccli": "./bin/run.js",
@@ -11,19 +11,23 @@
   "dependencies": {
     "@oclif/core": "^4",
     "@oclif/plugin-help": "^6",
-    "@oclif/plugin-plugins": "^5",
+    "async-retry": "^1.3.3",
+    "bignumber.js": "^9.1.2",
     "cli-table3": "^0.6.5",
     "enquirer": "^2.4.1",
     "level": "^8.0.1",
     "listr2": "^8.2.1",
-    "otmoic-software-development-kit": "^0.0.6",
+    "needle": "^3.3.1",
+    "otmoic-software-development-kit": "^0.0.46",
     "puppeteer": "^22.10.0"
   },
   "devDependencies": {
     "@oclif/prettier-config": "^0.2.1",
     "@oclif/test": "^4",
+    "@types/async-retry": "^1.4.8",
     "@types/chai": "^4",
     "@types/mocha": "^10",
+    "@types/needle": "^3.3.0",
     "@types/node": "^18",
     "chai": "^4",
     "eslint": "^8",
@@ -56,8 +60,7 @@
     "dirname": "otmoiccli",
     "topicSeparator": " ",
     "plugins": [
-      "@oclif/plugin-help",
-      "@oclif/plugin-plugins"
+      "@oclif/plugin-help"
     ],
     "topics": {
       "hello": {
@@ -71,7 +74,7 @@
     "lint": "eslint . --ext .ts",
     "postpack": "shx rm -f oclif.manifest.json",
     "posttest": "npm run lint",
-    "prepack": "oclif manifest && oclif readme",
+    "prepack": "oclif manifest && oclif readme && cp -r node_modules/bignumber.js dist/",
     "test": "mocha --forbid-only \"test/**/*.test.ts\"",
     "version": "oclif readme && git add README.md"
   },

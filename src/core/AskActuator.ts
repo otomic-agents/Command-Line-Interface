@@ -1,4 +1,4 @@
-import { Quote, Relay, TranslatedBridge } from 'otmoic-software-development-kit';
+import { Quote, Relay, TranslatedBridge, utils } from 'otmoic-software-development-kit';
 import GetBridgeActuator from './GetBridgeActuator'
 import { prompt } from 'enquirer';
 import { Listr, delay } from 'listr2';
@@ -67,9 +67,9 @@ export default class AskActuator {
               enabled: 'Yes',
               disabled: 'No'
             });
-            console.log('configRpc', configRpc)
+            console.log('configRpc', configRpc.value)
             if (configRpc.value == true) {
-              const rpcsValue: string = await prompt({
+              const rpcsValue: any = await prompt({
                 name: 'ConfigRPSC',
                 type: 'snippet',
                 message: 'enter your rpc url',
@@ -81,7 +81,10 @@ export default class AskActuator {
               })
       
               console.log('rpcsValue', rpcsValue)
-              this.rpcs = JSON.parse(rpcsValue)
+              this.rpcs = {
+                bsc: rpcsValue.ConfigRPSC.values.bsc_rpc_url,
+                opt: rpcsValue.ConfigRPSC.values.opt_rpc_url
+              }
             }
       
         }
@@ -91,7 +94,7 @@ export default class AskActuator {
 
         await this.initRelayUrl()
         await this.initNetwork()
-        await this.initRelayUrl()
+        await this.initChainRpc()
 
         if (this.relayUrl == undefined) {
             throw new Error("know error, relayUrl is undefined");
@@ -104,6 +107,10 @@ export default class AskActuator {
         const bridgeInfo = await getBridge.run()
         if (bridgeInfo == undefined) {
             throw new Error("get bridge info from relay failed");
+        }
+        if (bridgeInfo.length == 0) {
+            console.log('bridge list is empty')
+            return
         }
 
         const choosed = await this.chooseABridge(bridgeInfo)
@@ -125,7 +132,7 @@ export default class AskActuator {
             amount: this.amount
         }, {
             OnQuote: (quote: Quote) => {
-                console.log('t789')
+
                 for (const iterator of quotes) {
                     if (iterator.lp_info.name == quote.lp_info.name) {
                         return
@@ -164,7 +171,7 @@ export default class AskActuator {
         const choices = []
         for (const iterator of bridgeInfo) {
             choices.push({
-                name: `${iterator.srcChainName}-${iterator.src_token}(${iterator.srcTokenSymbol})-->${iterator.dstChainName}-${iterator.dst_token}(${iterator.dstTokenSymbol})`,
+                name: `${iterator.srcChainName}---${iterator.src_token}(${iterator.srcTokenSymbol})-->${iterator.dstChainName}---${iterator.dst_token}(${iterator.dstTokenSymbol})`,
                 value: ''
             })
         }
@@ -179,8 +186,8 @@ export default class AskActuator {
         }
 
         const [src, dst] = this.bridgeName.split('-->')
-        const [srcChain, srcToken] = src.split('-')
-        const [dstChain, dstToken] = dst.split('-')
+        const [srcChain, srcToken] = src.split('---')
+        const [dstChain, dstToken] = dst.split('---')
         let choosed : TranslatedBridge | undefined = undefined
         for (const iterator of bridgeInfo) {
             if (srcChain == iterator.srcChainName &&
@@ -201,12 +208,18 @@ export default class AskActuator {
     })
 
     chooseAQuote = (quotes: Quote[]) => new Promise<Quote | undefined>(async (resolve, reject) => {
+        
+        if (this.amount == undefined) {
+            throw new Error("amount is undefined");
+        }
+
         const choices = []
         const table = new Table()
         table.push([
             'lp name', 
             'credit score',
             'price', 
+            'estimate',
             'capacity',
             'native token price',
             'native token min',
@@ -214,10 +227,12 @@ export default class AskActuator {
             'need kyc',
             ])
         for (const iterator of quotes) {
+            const {dstAmount, dstNativeAmount} = utils.MathReceived(iterator, this.amount, 0)
             table.push([
                 iterator.lp_info.name, 
                 iterator.lp_info.credit_score,
                 iterator.quote_base.price, 
+                dstAmount,
                 iterator.quote_base.capacity,
                 iterator.quote_base.native_token_price,
                 iterator.quote_base.native_token_min,
@@ -259,34 +274,52 @@ export default class AskActuator {
         this.loading = true
         let times = 5
         
-        await delay(500)
-        try {
-            await new Listr([
-                {
-                    title: message,
-                    enabled: true,
-                    task: async(_: any, task: any): Promise<void> => {
-                        
-                        while (this.loading) {
-                            
-                            task.output = `${times}...`
-                            await delay(1000)
-                            times--
-
-                            if (autoStop) {
-                                if (times == 0) {
-                                    this.stopLoading()
-                                }
-                            }
-
-                        }
-                        resolve()
-                    }
-                }
-            ]).run()
-        } catch (error) {
-            console.error(error)
+        let taskNow : any | undefined = undefined
+        const uncaughtExceptionListener = (error: Error) => {
+            if (error.message.includes('xhr poll error') || error.message.includes('timeout')) {
+                console.error('relay web socket connection error', error)
+                process.exit(1)
+            }
+            if (taskNow != undefined) {
+                taskNow.output = error.message
+            }
         }
+
+        const unhandledRejectionListener = (reason: any, promise: Promise<any>) => {
+            if (taskNow != undefined) {
+                taskNow.output = reason
+            }
+        }
+        process.on('uncaughtException', uncaughtExceptionListener)
+        process.on('unhandledRejection', unhandledRejectionListener)
+        await delay(500)
+        await new Listr([
+            {
+                title: message,
+                enabled: true,
+                task: async(_: any, task: any): Promise<void> => {
+                    taskNow = task
+
+                    while (this.loading) {
+                        
+                        task.output = `${times}...`
+                        await delay(1000)
+                        times--
+
+                        if (autoStop) {
+                            if (times == 0) {
+                                this.stopLoading()
+                            }
+                        }
+
+                    }
+                    
+                    process.removeListener('uncaughtException', uncaughtExceptionListener)
+                    process.removeListener('unhandledRejection', unhandledRejectionListener)
+                    resolve()
+                }
+            }
+        ]).run()
     })
 
     stopLoading = () => {

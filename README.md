@@ -20,7 +20,7 @@ $ npm install -g otmoiccli
 $ otmoiccli COMMAND
 running command...
 $ otmoiccli (--version)
-otmoiccli/0.0.0 darwin-arm64 node-v20.11.1
+otmoiccli/0.0.7 darwin-arm64 node-v20.11.1
 $ otmoiccli --help [COMMAND]
 USAGE
   $ otmoiccli COMMAND
@@ -29,61 +29,36 @@ USAGE
 <!-- usagestop -->
 # Commands
 <!-- commands -->
-* [`otmoiccli hello PERSON`](#otmoiccli-hello-person)
-* [`otmoiccli hello world`](#otmoiccli-hello-world)
+* [`otmoiccli ask`](#otmoiccli-ask)
 * [`otmoiccli help [COMMAND]`](#otmoiccli-help-command)
-* [`otmoiccli plugins`](#otmoiccli-plugins)
-* [`otmoiccli plugins add PLUGIN`](#otmoiccli-plugins-add-plugin)
-* [`otmoiccli plugins:inspect PLUGIN...`](#otmoiccli-pluginsinspect-plugin)
-* [`otmoiccli plugins install PLUGIN`](#otmoiccli-plugins-install-plugin)
-* [`otmoiccli plugins link PATH`](#otmoiccli-plugins-link-path)
-* [`otmoiccli plugins remove [PLUGIN]`](#otmoiccli-plugins-remove-plugin)
-* [`otmoiccli plugins reset`](#otmoiccli-plugins-reset)
-* [`otmoiccli plugins uninstall [PLUGIN]`](#otmoiccli-plugins-uninstall-plugin)
-* [`otmoiccli plugins unlink [PLUGIN]`](#otmoiccli-plugins-unlink-plugin)
-* [`otmoiccli plugins update`](#otmoiccli-plugins-update)
+* [`otmoiccli monkey`](#otmoiccli-monkey)
+* [`otmoiccli reportforms`](#otmoiccli-reportforms)
+* [`otmoiccli swap`](#otmoiccli-swap)
 
-## `otmoiccli hello PERSON`
+## `otmoiccli ask`
 
-Say hello
+ask for relay
 
 ```
 USAGE
-  $ otmoiccli hello PERSON -f <value>
-
-ARGUMENTS
-  PERSON  Person to say hello to
+  $ otmoiccli ask [-r <value>] [-n <value>] [-c <value>] [-b <value>] [-a <value>]
 
 FLAGS
-  -f, --from=<value>  (required) Who is saying hello
+  -a, --amount=<value>    amount for you want to exchange
+  -b, --bridge=<value>    bridge name, like: BSC-0x55d398326f99059ff775485246999027b3197955(USDT)-->OPT-0x94b008aa00579c
+                          1307b0ef2c499ad98a8ce58e58(USDT)
+  -c, --chainRpc=<value>  rpc config json, like: { bsc: "<RPC_BSC>" }
+  -n, --network=<value>   network: mainnet / testnet
+  -r, --relay=<value>     relay url
 
 DESCRIPTION
-  Say hello
+  ask for relay
 
 EXAMPLES
-  $ otmoiccli hello friend --from oclif
-  hello friend from oclif! (./src/commands/hello/index.ts)
+  $ otmoiccli ask
 ```
 
-_See code: [src/commands/hello/index.ts](https://github.com/otmoic/Command-Line-Interface/blob/v0.0.0/src/commands/hello/index.ts)_
-
-## `otmoiccli hello world`
-
-Say hello world
-
-```
-USAGE
-  $ otmoiccli hello world
-
-DESCRIPTION
-  Say hello world
-
-EXAMPLES
-  $ otmoiccli hello world
-  hello world! (./src/commands/hello/world.ts)
-```
-
-_See code: [src/commands/hello/world.ts](https://github.com/otmoic/Command-Line-Interface/blob/v0.0.0/src/commands/hello/world.ts)_
+_See code: [src/commands/ask.ts](https://github.com/otmoic/Command-Line-Interface/blob/v0.0.7/src/commands/ask.ts)_
 
 ## `otmoiccli help [COMMAND]`
 
@@ -105,292 +80,86 @@ DESCRIPTION
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v6.2.0/src/commands/help.ts)_
 
-## `otmoiccli plugins`
+## `otmoiccli monkey`
 
-List installed plugins.
+describe the command here
 
 ```
 USAGE
-  $ otmoiccli plugins [--json] [--core]
+  $ otmoiccli monkey [-i <value>] [-r <value>] [-a <value>] [-b <value>] [-p <value>] [-s <value>] [-w <value>] [-t
+    <value>] [-C <value>] [-l <value>] [-n <value>] [-c <value>] [-T <value>] [-S <>]
 
 FLAGS
-  --core  Show core plugins.
-
-GLOBAL FLAGS
-  --json  Format output as json.
+  -C, --complaint=<value>           do complaint, enter [true] or [false], if "type" is not "succeed", complaint can be run
+  -a, --amount=<value>              the percentage of srctokens exchanged (base of balance) in each test, random within a
+                                    specific range, in the format of [min]-[max]
+  -b, --bridge=<value>              the bridges to be tested are separated by commas. If it is empty, there is no limit.
+  -c, --chainRpc=<value>            rpc config json, like: { bsc: "<RPC_BSC>" }
+  -i, --interval=<value>            the interval between the two monkeys' departures is random within a certain range, in the
+                                    format of [min]-[max]
+  -l, --lp=<value>                  the lp name to be tested. no restriction if empty.
+  -n, --network=<value>             network: main / test
+  -p, --privateKey=<value>          evm private key used during testing
+  -s, --solanaPrivateKey=<value>    solana private key used during testing
+  -r, --relay=<value>               relay url
+  -t, --type=<value>                the test type, separated by commas, [succeed] or [refund] or [cheat amount] or [cheat
+                                    address] or [cheat txin]
+  -w, --webhook=<value>             webhook address for receiving execution reports
+  -T, --to=<value>                  your evm address for receiving token
+  -S, --solanaTo=<value>            your solana address for receiving token
 
 DESCRIPTION
-  List installed plugins.
+  describe the command here
 
 EXAMPLES
-  $ otmoiccli plugins
+  $ otmoiccli monkey
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v5.2.3/src/commands/plugins/index.ts)_
+_See code: [src/commands/monkey.ts](https://github.com/otmoic/Command-Line-Interface/blob/v0.0.7/src/commands/monkey.ts)_
 
-## `otmoiccli plugins add PLUGIN`
+## `otmoiccli reportforms`
 
-Installs a plugin into otmoiccli.
+describe the command here
 
 ```
 USAGE
-  $ otmoiccli plugins add PLUGIN... [--json] [-f] [-h] [-s | -v]
-
-ARGUMENTS
-  PLUGIN...  Plugin to install.
-
-FLAGS
-  -f, --force    Force npm to fetch remote resources even if a local copy exists on disk.
-  -h, --help     Show CLI help.
-  -s, --silent   Silences npm output.
-  -v, --verbose  Show verbose npm output.
-
-GLOBAL FLAGS
-  --json  Format output as json.
+  $ otmoiccli reportforms
 
 DESCRIPTION
-  Installs a plugin into otmoiccli.
-
-  Uses npm to install plugins.
-
-  Installation of a user-installed plugin will override a core plugin.
-
-  Use the OTMOICCLI_NPM_LOG_LEVEL environment variable to set the npm loglevel.
-  Use the OTMOICCLI_NPM_REGISTRY environment variable to set the npm registry.
-
-ALIASES
-  $ otmoiccli plugins add
+  describe the command here
 
 EXAMPLES
-  Install a plugin from npm registry.
-
-    $ otmoiccli plugins add myplugin
-
-  Install a plugin from a github url.
-
-    $ otmoiccli plugins add https://github.com/someuser/someplugin
-
-  Install a plugin from a github slug.
-
-    $ otmoiccli plugins add someuser/someplugin
+  $ otmoiccli reportforms
 ```
 
-## `otmoiccli plugins:inspect PLUGIN...`
+_See code: [src/commands/reportforms.ts](https://github.com/otmoic/Command-Line-Interface/blob/v0.0.7/src/commands/reportforms.ts)_
 
-Displays installation properties of a plugin.
+## `otmoiccli swap`
+
+exchange token
 
 ```
 USAGE
-  $ otmoiccli plugins inspect PLUGIN...
-
-ARGUMENTS
-  PLUGIN...  [default: .] Plugin to inspect.
+  $ otmoiccli swap [-r <value>] [-n <value>] [-c <value>] [-b <value>] [-a <value>] [-p <value>] [-s
+    <value>] [-t <value>]
 
 FLAGS
-  -h, --help     Show CLI help.
-  -v, --verbose
-
-GLOBAL FLAGS
-  --json  Format output as json.
+  -a, --amount=<value>             amount for you want to exchange
+  -b, --bridge=<value>             bridge name, like: BSC-0x55d398326f99059ff775485246999027b3197955(USDT)-->OPT-0x94b00
+                                   8aa00579c1307b0ef2c499ad98a8ce58e58(USDT)
+  -c, --chainRpc=<value>           rpc config json, like: { bsc: "<RPC_BSC>" }
+  -n, --network=<value>            network: mainnet / testnet
+  -p, --privateKeyForSign=<value>  your wallet private key for sign this deal
+  -r, --relay=<value>              relay url
+  -s, --privateKeyForSend=<value>  your wallet private key for send src token
+  -t, --to=<value>                 your wallet address for receiving token
 
 DESCRIPTION
-  Displays installation properties of a plugin.
+  exchange token
 
 EXAMPLES
-  $ otmoiccli plugins inspect myplugin
+  $ otmoiccli swap
 ```
 
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v5.2.3/src/commands/plugins/inspect.ts)_
-
-## `otmoiccli plugins install PLUGIN`
-
-Installs a plugin into otmoiccli.
-
-```
-USAGE
-  $ otmoiccli plugins install PLUGIN... [--json] [-f] [-h] [-s | -v]
-
-ARGUMENTS
-  PLUGIN...  Plugin to install.
-
-FLAGS
-  -f, --force    Force npm to fetch remote resources even if a local copy exists on disk.
-  -h, --help     Show CLI help.
-  -s, --silent   Silences npm output.
-  -v, --verbose  Show verbose npm output.
-
-GLOBAL FLAGS
-  --json  Format output as json.
-
-DESCRIPTION
-  Installs a plugin into otmoiccli.
-
-  Uses npm to install plugins.
-
-  Installation of a user-installed plugin will override a core plugin.
-
-  Use the OTMOICCLI_NPM_LOG_LEVEL environment variable to set the npm loglevel.
-  Use the OTMOICCLI_NPM_REGISTRY environment variable to set the npm registry.
-
-ALIASES
-  $ otmoiccli plugins add
-
-EXAMPLES
-  Install a plugin from npm registry.
-
-    $ otmoiccli plugins install myplugin
-
-  Install a plugin from a github url.
-
-    $ otmoiccli plugins install https://github.com/someuser/someplugin
-
-  Install a plugin from a github slug.
-
-    $ otmoiccli plugins install someuser/someplugin
-```
-
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v5.2.3/src/commands/plugins/install.ts)_
-
-## `otmoiccli plugins link PATH`
-
-Links a plugin into the CLI for development.
-
-```
-USAGE
-  $ otmoiccli plugins link PATH [-h] [--install] [-v]
-
-ARGUMENTS
-  PATH  [default: .] path to plugin
-
-FLAGS
-  -h, --help          Show CLI help.
-  -v, --verbose
-      --[no-]install  Install dependencies after linking the plugin.
-
-DESCRIPTION
-  Links a plugin into the CLI for development.
-  Installation of a linked plugin will override a user-installed or core plugin.
-
-  e.g. If you have a user-installed or core plugin that has a 'hello' command, installing a linked plugin with a 'hello'
-  command will override the user-installed or core plugin implementation. This is useful for development work.
-
-
-EXAMPLES
-  $ otmoiccli plugins link myplugin
-```
-
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v5.2.3/src/commands/plugins/link.ts)_
-
-## `otmoiccli plugins remove [PLUGIN]`
-
-Removes a plugin from the CLI.
-
-```
-USAGE
-  $ otmoiccli plugins remove [PLUGIN...] [-h] [-v]
-
-ARGUMENTS
-  PLUGIN...  plugin to uninstall
-
-FLAGS
-  -h, --help     Show CLI help.
-  -v, --verbose
-
-DESCRIPTION
-  Removes a plugin from the CLI.
-
-ALIASES
-  $ otmoiccli plugins unlink
-  $ otmoiccli plugins remove
-
-EXAMPLES
-  $ otmoiccli plugins remove myplugin
-```
-
-## `otmoiccli plugins reset`
-
-Remove all user-installed and linked plugins.
-
-```
-USAGE
-  $ otmoiccli plugins reset [--hard] [--reinstall]
-
-FLAGS
-  --hard       Delete node_modules and package manager related files in addition to uninstalling plugins.
-  --reinstall  Reinstall all plugins after uninstalling.
-```
-
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v5.2.3/src/commands/plugins/reset.ts)_
-
-## `otmoiccli plugins uninstall [PLUGIN]`
-
-Removes a plugin from the CLI.
-
-```
-USAGE
-  $ otmoiccli plugins uninstall [PLUGIN...] [-h] [-v]
-
-ARGUMENTS
-  PLUGIN...  plugin to uninstall
-
-FLAGS
-  -h, --help     Show CLI help.
-  -v, --verbose
-
-DESCRIPTION
-  Removes a plugin from the CLI.
-
-ALIASES
-  $ otmoiccli plugins unlink
-  $ otmoiccli plugins remove
-
-EXAMPLES
-  $ otmoiccli plugins uninstall myplugin
-```
-
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v5.2.3/src/commands/plugins/uninstall.ts)_
-
-## `otmoiccli plugins unlink [PLUGIN]`
-
-Removes a plugin from the CLI.
-
-```
-USAGE
-  $ otmoiccli plugins unlink [PLUGIN...] [-h] [-v]
-
-ARGUMENTS
-  PLUGIN...  plugin to uninstall
-
-FLAGS
-  -h, --help     Show CLI help.
-  -v, --verbose
-
-DESCRIPTION
-  Removes a plugin from the CLI.
-
-ALIASES
-  $ otmoiccli plugins unlink
-  $ otmoiccli plugins remove
-
-EXAMPLES
-  $ otmoiccli plugins unlink myplugin
-```
-
-## `otmoiccli plugins update`
-
-Update installed plugins.
-
-```
-USAGE
-  $ otmoiccli plugins update [-h] [-v]
-
-FLAGS
-  -h, --help     Show CLI help.
-  -v, --verbose
-
-DESCRIPTION
-  Update installed plugins.
-```
-
-_See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v5.2.3/src/commands/plugins/update.ts)_
+_See code: [src/commands/swap.ts](https://github.com/otmoic/Command-Line-Interface/blob/v0.0.7/src/commands/swap.ts)_
 <!-- commandsstop -->

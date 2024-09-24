@@ -12,7 +12,6 @@ export default class Reportforms extends Command implements ExistTask {
   taskNow: any
 
   static override args = {
-    file: Args.string({description: 'file to read'}),
   }
 
   static override description = 'describe the command here'
