@@ -429,9 +429,7 @@ export default class MonkeyActuator {
                                                 .then(() => finished = true)
                                                 .catch(async (err) => {
                                                     await this.taskExchangeTxOutRefund(task, dealInfo)
-                                                    .then(() => {
-                                                        throw err;
-                                                    })
+                                                    throw err
                                                 })
 
                                             while (finished == false) {
@@ -659,8 +657,8 @@ export default class MonkeyActuator {
 
         const balance = await this.getBalance(dealInfo.bridge)
         if (dealInfo.bridge.src_token == ZeroAddress) {
-            this.config.amountMin = 700
-            this.config.amountMax = 700
+            this.config.amountMin = 800
+            this.config.amountMax = 800
         }
         dealInfo.amount = balance.times(getRandomNumberInRange(this.config.amountMin, this.config.amountMax)).div(1000).toFixed(6, Bignumber.ROUND_DOWN)
 
