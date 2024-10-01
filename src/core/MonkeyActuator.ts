@@ -379,6 +379,10 @@ export default class MonkeyActuator {
                                 let finished = false
                                 this.taskSubmitDeal(task, relay, dealInfo)
                                     .then(() => finished = true)
+                                    .catch(async (err) => {
+                                        task.output = err
+                                        await this.callWebHookFailed(task, relay, dealInfo)
+                                    })
                                 while (finished == false) {
                                     await delay(100)
                                 }
@@ -428,8 +432,7 @@ export default class MonkeyActuator {
                                             this.taskExchangeTxOutCfm(task, relay, dealInfo)
                                                 .then(() => finished = true)
                                                 .catch(async (err) => {
-                                                    await this.taskExchangeTxOutRefund(task, dealInfo)
-                                                    throw err
+                                                    console.error(err)
                                                 })
 
                                             while (finished == false) {
@@ -569,6 +572,7 @@ export default class MonkeyActuator {
 
             await needle('post', this.config.webhook, {
                 state: 'succeed',
+                time: (new Date()).toUTCString(),
                 network: this.config.network,
                 relay: relay.relayUrl,
                 bridge: dealInfo.business?.swap_asset_information.quote.quote_base.bridge.bridge_name,
@@ -591,6 +595,7 @@ export default class MonkeyActuator {
 
             await needle('post', this.config.webhook, {
                 state: 'failed',
+                time: (new Date()).toUTCString(),
                 network: this.config.network,
                 relay: relay.relayUrl,
                 bridge: dealInfo.business?.swap_asset_information.quote.quote_base.bridge.bridge_name,
@@ -715,46 +720,50 @@ export default class MonkeyActuator {
             throw new Error("quote is undefined");
         }
 
-        dealInfo.srcRpc = this.config.rpcs[utils.GetChainName(dealInfo.quote.quote_base.bridge.src_chain_id).toLowerCase()]
-        dealInfo.dstRpc = this.config.rpcs[utils.GetChainName(dealInfo.quote.quote_base.bridge.dst_chain_id).toLowerCase()]
-
-        task.output = 'submitting...'
-
-        let privateKey = ''
-        if (utils.GetChainType(dealInfo.quote.quote_base.bridge.src_chain_id) == 'evm') {
-            privateKey = this.config.privateKey
-        } else if (utils.GetChainType(dealInfo.quote.quote_base.bridge.src_chain_id) == 'solana') {
-            privateKey = this.config.solanaPrivateKey
+        try {
+            dealInfo.srcRpc = this.config.rpcs[utils.GetChainName(dealInfo.quote.quote_base.bridge.src_chain_id).toLowerCase()]
+            dealInfo.dstRpc = this.config.rpcs[utils.GetChainName(dealInfo.quote.quote_base.bridge.dst_chain_id).toLowerCase()]
+    
+            task.output = 'submitting...'
+    
+            let privateKey = ''
+            if (utils.GetChainType(dealInfo.quote.quote_base.bridge.src_chain_id) == 'evm') {
+                privateKey = this.config.privateKey
+            } else if (utils.GetChainType(dealInfo.quote.quote_base.bridge.src_chain_id) == 'solana') {
+                privateKey = this.config.solanaPrivateKey
+            }
+    
+            let receivingAddress = ''
+            if (utils.GetChainType(dealInfo.quote.quote_base.bridge.dst_chain_id) == 'evm') {
+                receivingAddress = this.config.receivingAddress
+            } else if (utils.GetChainType(dealInfo.quote.quote_base.bridge.dst_chain_id) == 'solana') {
+                receivingAddress = this.config.solanaReceivingAddress
+            }
+    
+            dealInfo.signData =
+                await Business.signQuoteByPrivateKey(
+                    this.config.network, dealInfo.quote, privateKey, dealInfo.amount, 0,
+                    receivingAddress, undefined, dealInfo.srcRpc, dealInfo.dstRpc)
+    
+            dealInfo.business = await relay.swap(dealInfo.quote, dealInfo.signData.signData, dealInfo.signData.signed)
+    
+            if (dealInfo.business == undefined) {
+                throw new Error('failed to get business as relay returned a undefined due to unknown reason');
+            }
+            
+            if (dealInfo.business.locked == false) {
+                throw new Error(`lp lock failed: ${JSON.stringify(dealInfo.business.lock_message)}`);
+            }
+            console.log(`dealInfo.business`, dealInfo.business)
+            console.log(`dealInfo.business.swap_asset_information.quote.quote_base`, dealInfo.business.swap_asset_information.quote.quote_base)
+    
+            task.title = `${task.title} -- (bidid:${dealInfo.business.hash})`
+    
+            await delay(50)
+            resolve()
+        } catch (err) {
+            reject(err)
         }
-
-        let receivingAddress = ''
-        if (utils.GetChainType(dealInfo.quote.quote_base.bridge.dst_chain_id) == 'evm') {
-            receivingAddress = this.config.receivingAddress
-        } else if (utils.GetChainType(dealInfo.quote.quote_base.bridge.dst_chain_id) == 'solana') {
-            receivingAddress = this.config.solanaReceivingAddress
-        }
-
-        dealInfo.signData =
-            await Business.signQuoteByPrivateKey(
-                this.config.network, dealInfo.quote, privateKey, dealInfo.amount, 0,
-                receivingAddress, undefined, dealInfo.srcRpc, dealInfo.dstRpc)
-
-        dealInfo.business = await relay.swap(dealInfo.quote, dealInfo.signData.signData, dealInfo.signData.signed)
-
-        if (dealInfo.business == undefined) {
-            throw new Error('failed to get business');
-        }
-        
-        if (dealInfo.business.locked == false) {
-            throw new Error(`lp lock failed: ${JSON.stringify(dealInfo.business.hash)}`);
-        }
-        console.log(`dealInfo.business`, dealInfo.business)
-        console.log(`dealInfo.business.swap_asset_information.quote.quote_base`, dealInfo.business.swap_asset_information.quote.quote_base)
-
-        task.title = `${task.title} -- (bidid:${dealInfo.business.hash})`
-
-        await delay(50)
-        resolve()
     })
 
     taskExchangeTxOut = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
