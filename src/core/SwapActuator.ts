@@ -34,8 +34,6 @@ export default class SwapActuator {
 
     dstRpc: string | undefined
 
-    solanaUuid: string | undefined
-
     constructor (relayUrl: string | undefined, network: string | undefined, rpcs: string | undefined, 
         bridgeName: string | undefined, amount: string | undefined, privateKeyForSign: string | undefined,
         privateKeyForSend: string | undefined, receivingAddress: string | undefined) {
@@ -176,7 +174,7 @@ export default class SwapActuator {
         this.dstRpc = this.rpcs[utils.GetChainName(this.quote.quote_base.bridge.dst_chain_id).toLowerCase()]
 
         const signData: {signData: SignData, signed: string} = await Business.signQuoteByPrivateKey(this.network, this.quote, this.privateKeyForSign, this.amount, 0, this.receivingAddress, 
-        undefined, this.srcRpc, this.dstRpc)
+        undefined, undefined, undefined, this.srcRpc, this.dstRpc)
 
         resolve(signData)
     })
@@ -286,7 +284,6 @@ export default class SwapActuator {
                         task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
                     } else if (utils.GetChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
                         task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
-                        this.solanaUuid = (resp as ResponseSolana).uuid
                     }
 
                     step = 3
@@ -352,7 +349,7 @@ export default class SwapActuator {
                         const resp = await Business.transferOutConfirmByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc)
                         task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
                     } else if (utils.GetChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-                        const resp = await Business.transferOutConfirmByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc, this.solanaUuid!)
+                        const resp = await Business.transferOutConfirmByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc)
                         task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
                     }
 
