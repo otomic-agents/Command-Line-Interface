@@ -640,10 +640,9 @@ export default class MonkeyActuator {
                 for (const b of this.config.bridges) {
                     if (`${bridge.src_chain_id}-${bridge.src_token}--->${bridge.dst_chain_id}-${bridge.dst_token}` == b) {
                         return true
-                    } else {
-                        return false
                     }
                 }
+                return false
             }
         })
         // .filter(b => (b.src_chain_id != 501 && b.dst_chain_id != 501))
