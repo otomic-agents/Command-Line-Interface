@@ -310,24 +310,26 @@ export default class MonkeyActuator {
 
                                 if (dealInfo.step == Step.UserTransferOut) {
                                     task.output = `transfer out is failed to on chain`
+                                    await this.callWebHookFailed(task, relay, dealInfo)
                                 }
     
                                 if (dealInfo.step == Step.LpTransferIn) {
                                     task.output = "cannot get lp tx in, going to refund tx out"
                                     await this.taskExchangeTxOutRefund(task, dealInfo)
+                                    await this.callWebHookFailed(task, relay, dealInfo)
                                 }
 
                                 if (dealInfo.step == Step.UserConfirmOut) {
                                     task.output = "confirm out is failed on chain, going to refund tx out"
                                     await this.taskExchangeTxOutRefund(task, dealInfo)
+                                    await this.callWebHookFailed(task, relay, dealInfo)
                                 }
     
                                 if (dealInfo.type == 'cheat txin' && dealInfo.step == Step.LpConfirmIn) {
                                     task.output = "relay tx out confirm - cannot get transfer out confirm event from relay at task timeout -- going to refund tx out"
                                     await this.taskExchangeTxOutRefund(task, dealInfo)
+                                    await this.callWebHookFailed(task, relay, dealInfo)
                                 }   
-    
-                                await this.callWebHookFailed(task, relay, dealInfo)
                             }
 
                             if (dealInfo.type?.startsWith('cheat') && dealInfo.complaint == true) {
@@ -712,6 +714,7 @@ export default class MonkeyActuator {
             amount: dealInfo.amount
         }, {
             OnQuote: (quote: Quote) => {
+                console.log(quote)
                 if (this.config.lp == undefined || this.config.lp == '') {
                     dealInfo.quote = quote
                 } else {
@@ -772,7 +775,7 @@ export default class MonkeyActuator {
             }
             
             if (dealInfo.business.locked == false) {
-                throw new Error(`lp lock failed: ${JSON.stringify(dealInfo.business.lock_message)}`);
+                throw new Error(`lp lock failed: ${dealInfo.business.lock_message}`);
             }
             console.log(`dealInfo.business`, dealInfo.business)
             console.log(`dealInfo.business.swap_asset_information.quote.quote_base`, dealInfo.business.swap_asset_information.quote.quote_base)
