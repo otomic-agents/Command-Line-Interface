@@ -314,20 +314,20 @@ export default class MonkeyActuator {
                                 }
     
                                 if (dealInfo.step == Step.LpTransferIn) {
-                                    task.output = "cannot get lp tx in, going to refund tx out"
                                     await this.taskExchangeTxOutRefund(task, dealInfo)
+                                    task.output = "cannot get lp tx in, going to refund tx out"
                                     await this.callWebHookFailed(task, relay, dealInfo)
                                 }
 
                                 if (dealInfo.step == Step.UserConfirmOut) {
-                                    task.output = "confirm out is failed on chain, going to refund tx out"
                                     await this.taskExchangeTxOutRefund(task, dealInfo)
+                                    task.output = "confirm out is failed on chain, going to refund tx out"
                                     await this.callWebHookFailed(task, relay, dealInfo)
                                 }
     
                                 if (dealInfo.type == 'cheat txin' && dealInfo.step == Step.LpConfirmIn) {
-                                    task.output = "relay tx out confirm - cannot get transfer out confirm event from relay at task timeout -- going to refund tx out"
                                     await this.taskExchangeTxOutRefund(task, dealInfo)
+                                    task.output = "relay tx out confirm - cannot get transfer out confirm event from relay at task timeout -- going to refund tx out"
                                     await this.callWebHookFailed(task, relay, dealInfo)
                                 }   
                             }
@@ -659,7 +659,7 @@ export default class MonkeyActuator {
             }
         }
 
-        task.output = `enough balance bridge size: ${bridgeList.length}`
+        task.output = `enough balance bridge size: ${enoughList.length}`
 
         if (enoughList.length == 0) {
             throw new Error("no bridge can test");
@@ -1399,6 +1399,7 @@ export default class MonkeyActuator {
         }
         const balance = await assistive.GetBalance(bridge, address, this.config.network,
             this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()])
+        console.log(`${address} balance on token ${bridge.src_token} is : ${balance}`)
         if (parseFloat(balance) > 0) {
             resolve(true)
         } else {
