@@ -286,6 +286,44 @@ export default class MonkeyActuator {
             }
         }
 
+        process.on('uncaughtException', async (error: Error) => {
+            if (error.message == "tasks finished") {
+                console.log("tasks finished")
+                process.exit(0)
+            }
+
+            if (error.message == "get quote failed") {
+                console.log("get quote fialed")
+                process.exit(0)
+            }
+
+            let task = {
+                title: error.name,
+                output: error.message + "\n" + error.stack
+            }
+            await this.callWebHookFailed(task, relay, dealInfo)
+            throw error
+        });
+        
+        process.on('unhandledRejection', async (reason: any, promise: Promise<any>) => {
+            if (reason.message == "tasks finished") {
+                console.log("tasks finished")
+                process.exit(0)
+            }
+
+            if (reason.message == "get quote failed") {
+                console.log("get quote fialed")
+                process.exit(0)
+            }
+
+            let task = {
+                title: reason.name,
+                output: reason.message + "\n" + reason.stack
+            }
+            await this.callWebHookFailed(task, relay, dealInfo)
+            throw reason
+        });
+
         try {
             this.taskList = new Listr([
                 {
