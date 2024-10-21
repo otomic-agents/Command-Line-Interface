@@ -293,7 +293,7 @@ export default class MonkeyActuator {
             }
 
             if (error.message == "get quote failed") {
-                console.log("get quote fialed")
+                console.log("get quote failed")
                 process.exit(0)
             }
 
@@ -312,7 +312,7 @@ export default class MonkeyActuator {
             }
 
             if (reason.message == "get quote failed") {
-                console.log("get quote fialed")
+                console.log("get quote failed")
                 process.exit(0)
             }
 
