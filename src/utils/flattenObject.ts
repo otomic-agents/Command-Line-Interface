@@ -29,3 +29,8 @@ export function getFormattedDateTime() {
 
     return `${year}-${month}-${day}-${hours}-${minutes}-${seconds}`;
 }
+
+export function sanitizeForJSON(str: string) {
+    return str.replace(/[\n"&\r\t\b\f{}`']/g, ' ');
+  }
+  

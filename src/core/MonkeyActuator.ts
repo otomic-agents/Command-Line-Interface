@@ -6,7 +6,7 @@ import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, bus
 import Bignumber from 'bignumber.js'
 import needle from 'needle'
 import retry from 'async-retry';
-import { objectToString, getFormattedDateTime } from '../utils/flattenObject';
+import { objectToString, getFormattedDateTime, sanitizeForJSON } from '../utils/flattenObject';
 
 function getRandomNumberInRange(n: number, m: number): number {
     return Math.floor(Math.random() * (m - n + 1) + n);
@@ -297,12 +297,18 @@ export default class MonkeyActuator {
                 process.exit(0)
             }
 
+            if (error.message == "no bridge can test") {
+                console.log("no bridge can test")
+                process.exit(0)
+            }
+
             let task = {
                 title: error.name,
                 output: error.message + "\n" + error.stack
             }
             await this.callWebHookFailed(task, relay, dealInfo)
-            throw error
+            console.error(error)
+            process.exit(1)
         });
         
         process.on('unhandledRejection', async (reason: any, promise: Promise<any>) => {
@@ -316,12 +322,18 @@ export default class MonkeyActuator {
                 process.exit(0)
             }
 
+            if (reason.message == "no bridge can test") {
+                console.log("no bridge can test")
+                process.exit(0)
+            }
+
             let task = {
                 title: reason.name,
                 output: reason.message + "\n" + reason.stack
             }
             await this.callWebHookFailed(task, relay, dealInfo)
-            throw reason
+            console.error(reason)
+            process.exit(1)
         });
 
         try {
@@ -642,7 +654,7 @@ export default class MonkeyActuator {
                     type: `test flow: ${dealInfo.type}`,
                     businessHash: '',
                     messageTitle: task.title,
-                    messageData: task.output,
+                    messageData: sanitizeForJSON(task.output),
                     swapDetail: ''
                 })
             }
@@ -662,7 +674,7 @@ export default class MonkeyActuator {
                 type: `test flow: ${dealInfo.type}`,
                 businessHash: dealInfo.business.hash,
                 messageTitle: task.title,
-                messageData: task.output,
+                messageData: sanitizeForJSON(task.output),
                 swapDetail: objectToString(rest2)
             })
 
@@ -948,6 +960,20 @@ export default class MonkeyActuator {
             throw new Error("business is undefined");
         }
 
+        let agreementReachedTime = dealInfo.business.swap_asset_information.agreement_reached_time * 1000
+        let expectedSingleStepTime = dealInfo.business.swap_asset_information.expected_single_step_time * 1000
+        let tolerantSingleStepTime = dealInfo.business.swap_asset_information.tolerant_single_step_time * 1000
+
+        let timelock = agreementReachedTime + 3 * expectedSingleStepTime + 1 * tolerantSingleStepTime
+        let canDo = false
+        while (canDo == false) {
+            await delay(2000)
+
+            canDo = Date.now() > (timelock + 10 * 1000)
+
+            task.output = `can cheat transfer in confirm: ${canDo}, now: ${Date.now()}, time lock: ${timelock + 10 * 1000}`
+        }
+
         const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
         let sender: string | undefined
         if (businessFull.event_transfer_in && businessFull.event_transfer_in.sender) {
@@ -965,6 +991,18 @@ export default class MonkeyActuator {
 
             const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, sender)
             task.title = `${task.title} -- user cheat confirm in -- ${(resp as ResponseSolana).txHash}`
+        }
+
+        let succeed = false
+        while (succeed == false) {
+            await delay(2000)
+            const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
+            task.output = `waiting... cheat transfer in confirm: ${resp.transfer_in_confirm_id}`
+            succeed = resp.transfer_in_confirm_id > 0
+
+            if (succeed) {
+                task.output = `cheat transfer in confirm is on chain successfully`
+            }
         }
 
         await delay(50)
@@ -1438,7 +1476,7 @@ export default class MonkeyActuator {
         const balance = await assistive.GetBalance(bridge, address, this.config.network,
             this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()])
         console.log(`${address} balance on token ${bridge.src_token} is : ${balance}`)
-        if (parseFloat(balance) > 0) {
+        if (parseFloat(balance) > 5) {
             resolve(true)
         } else {
             resolve(false)
