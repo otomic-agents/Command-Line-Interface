@@ -2,10 +2,10 @@
 
 # Load environment variables
 set -a
-source .env
+source ./env/monkeys.mainnet.env
 set +a
 
-log_directory="./logs/multi_monkey"
+log_directory="./logs/mainnet/multi_monkeys"
 
 if [ ! -d "$log_directory" ]; then
     mkdir -p "$log_directory"
@@ -21,7 +21,7 @@ run_monkey() {
     local log_file=$5
 
     echo "Starting monkey application..." >> "$log_file"
-    node bin/dev.js monkey -i 1200-1200 -r https://5b4522f4.nathanielight.myterminus.com -a 1000-1000 -p $evm_private_key -s $solana_private_key -t "succeed,refund" -C true -n mainnet -T $evm_public_key -S $solana_public_key -w http://n8n.edge-dev.xyz/webhook/f8b3f611-89b9-4128-8e93-b50ff7003530 -b "9006-0x55d398326f99059fF775485246999027B3197955--->501-0xc6fa7af3bedbad3a3d65f36aabc97431b1bbe4c2d2f6e0e47ca60203452f5d61,501-0xc6fa7af3bedbad3a3d65f36aabc97431b1bbe4c2d2f6e0e47ca60203452f5d61--->9006-0x55d398326f99059fF775485246999027B3197955" -c "{\"polygon\": \"https://polygon-rpc.com\"}" -l "maximilianus.myterminus.com" -d true >> "$log_file" 2>&1
+    node bin/dev.js monkey -i 600-600 -r https://xxxx -a 1000-1000 -p $evm_private_key -s $solana_private_key -t "succeed" -C true -n mainnet -T $evm_public_key -S $solana_public_key -w http://n8n.edge-dev.xyz/webhook/xxxxx -b "614-0x4200000000000000000000000000000000000042--->614-0x94b008aA00579c1307B0EF2c499aD98a8ce58e58,614-0x94b008aA00579c1307B0EF2c499aD98a8ce58e58--->614-0x4200000000000000000000000000000000000042" -c "{\"opt\": \"https://optimism-mainnet.infura.io/v3\"}" -l "maximilianus.myterminus.com" -d true >> "$log_file" 2>&1
 }
 
 # Function to check if current time is within the allowed window
@@ -29,8 +29,8 @@ is_allowed_time() {
     local current_hour=$(date +%H)
     local current_minute=$(date +%M)
     local current_time=$((current_hour * 60 + current_minute))
-    local start_time=$((10 * 60))  # 10:00 AM
-    local end_time=$((11 * 60))    # 11:00 AM
+    local start_time=$((10 * 60 + 30))  # 10:30 AM UTC -> 6:30 PM CST
+    local end_time=$((11 * 60))    # 11:00 AM UTC -> 7:00 PM CST
 
     if [ $current_time -ge $start_time ] && [ $current_time -lt $end_time ]; then
         return 0  # True, it's within the allowed time
@@ -68,20 +68,27 @@ while true; do
             
             run_monkey "${!evm_private_key_var}" "${!evm_public_key_var}" "${!solana_private_key_var}" "${!solana_public_key_var}" "$log_file" &
             
+            echo "counter: $counter"
             pids+=($!)
             ((counter++))
+            echo "pids: ${pids[@]}"
         done
 
         # Wait for all monkeys to finish
-        for pid in "${pids[@]}"; do
-            wait $pid
-            exit_code=$?
-            if [ $exit_code -ne 0 ]; then
-                echo "A monkey exited with code $exit_code at $(date)" >> "${log_directory}/error.log"
-                exit 1
-            fi
+        while [ ${#pids[@]} -gt 0 ]; do
+            for i in "${!pids[@]}"; do
+                if ! kill -0 ${pids[i]} 2>/dev/null; then
+                    wait ${pids[i]}
+                    exit_code=$?
+                    if [ $exit_code -ne 0 ]; then
+                        echo "Monkey ${pids[i]} exited with code $exit_code at $(date)"
+                    fi
+                    unset 'pids[i]'
+                fi
+            done
+            # Small sleep to prevent CPU thrashing
+            sleep 1
         done
-
         echo "All monkeys finished. Waiting for next allowed time window..."
     else
         echo "Outside of allowed time window. Waiting..."
