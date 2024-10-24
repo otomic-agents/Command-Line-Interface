@@ -287,6 +287,7 @@ export default class MonkeyActuator {
         }
 
         process.on('uncaughtException', async (error: Error) => {
+            console.warn(`got uncaughtException`, error)
             if (error.message == "tasks finished") {
                 console.log("tasks finished")
                 process.exit(0)
@@ -304,7 +305,7 @@ export default class MonkeyActuator {
 
             let task = {
                 title: error.name,
-                output: error.message + "\n" + error.stack
+                output: error.message + "==>" + error.stack
             }
             await this.callWebHookFailed(task, relay, dealInfo)
             console.error(error)
@@ -312,6 +313,7 @@ export default class MonkeyActuator {
         });
         
         process.on('unhandledRejection', async (reason: any, promise: Promise<any>) => {
+            console.warn(`got unhandledRejection`, reason)
             if (reason.message == "tasks finished") {
                 console.log("tasks finished")
                 process.exit(0)
@@ -329,7 +331,7 @@ export default class MonkeyActuator {
 
             let task = {
                 title: reason.name,
-                output: reason.message + "\n" + reason.stack
+                output: reason.message + "==>" + reason.stack
             }
             await this.callWebHookFailed(task, relay, dealInfo)
             console.error(reason)

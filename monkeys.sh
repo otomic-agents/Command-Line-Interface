@@ -26,8 +26,8 @@ run_monkey() {
 
 # Function to check if current time is within the allowed window
 is_allowed_time() {
-    local current_hour=$(date +%H)
-    local current_minute=$(date +%M)
+    local current_hour=$(date +%H | sed 's/^0*//')
+    local current_minute=$(date +%M | sed 's/^0*//')
     local current_time=$((current_hour * 60 + current_minute))
     local start_time=$((10 * 60 + 30))  # 10:30 AM UTC -> 6:30 PM CST
     local end_time=$((11 * 60))    # 11:00 AM UTC -> 7:00 PM CST
