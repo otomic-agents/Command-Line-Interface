@@ -124,6 +124,8 @@ interface DealInfo {
     } | undefined
 
     step: number | undefined
+
+    socketId: string | undefined
 }
 
 export default class MonkeyActuator {
@@ -241,7 +243,8 @@ export default class MonkeyActuator {
             srcRpc: undefined,
             dstRpc: undefined,
             signData: undefined,
-            step: undefined
+            step: undefined,
+            socketId: undefined,
         }
 
         let concurrentTaskOption: any
@@ -634,7 +637,8 @@ export default class MonkeyActuator {
                 amount: dealInfo.business?.swap_asset_information.amount,
                 type: `test flow: ${dealInfo.type}`,
                 businessHash: dealInfo.business?.hash,
-                swapDetail: objectToString(rest2)
+                swapDetail: objectToString(rest2),
+                socketId: dealInfo.socketId
             })
 
             resolve()
@@ -657,7 +661,8 @@ export default class MonkeyActuator {
                     businessHash: '',
                     messageTitle: task.title,
                     messageData: sanitizeForJSON(task.output),
-                    swapDetail: ''
+                    swapDetail: '',
+                    socketId: dealInfo.socketId
                 })
             }
 
@@ -677,7 +682,8 @@ export default class MonkeyActuator {
                 businessHash: dealInfo.business.hash,
                 messageTitle: task.title,
                 messageData: sanitizeForJSON(task.output),
-                swapDetail: objectToString(rest2)
+                swapDetail: objectToString(rest2),
+                socketId: dealInfo.socketId
             })
 
             resolve()
@@ -786,6 +792,8 @@ export default class MonkeyActuator {
             }
             await delay(500)
         }
+
+        dealInfo.socketId = relay.quoteManager.getSocketId()
 
         task.output = 'signing...'
 
