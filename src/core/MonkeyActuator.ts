@@ -1003,11 +1003,11 @@ export default class MonkeyActuator {
             await retry( async () => {
                 if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'evm') {
         
-                    const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.srcRpc, sender)
+                    const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.dstRpc, sender)
                     task.title = `${task.title} -- user cheat confirm in -- ${(resp as ethers.ContractTransactionResponse).hash}`
                 } else if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'solana') {
         
-                    const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, sender)
+                    const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.dstRpc, sender)
                     task.title = `${task.title} -- user cheat confirm in -- ${(resp as ResponseSolana).txHash}`
                 }
             }, {
