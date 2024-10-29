@@ -21,9 +21,9 @@ async function getBusinessRetry(relay: Relay, businessHash: string) {
             }, {
             retries: 5,
             onRetry: (error, attempt) => {
-                console.log(`retry ${attempt} -- get error -- ${error}`);
-            },
-        }
+                    console.log(`retry ${attempt} -- get error -- ${error}`);
+                },
+            }
         )
     })
 }
@@ -37,9 +37,9 @@ async function getBusinessFullRetry(relay: Relay, businessHash: string) {
             }, {
             retries: 5,
             onRetry: (error, attempt) => {
-                console.log(`retry ${attempt} -- get error -- ${error}`);
-            },
-        }
+                    console.log(`retry ${attempt} -- get error -- ${error}`);
+                },
+            }
         )
     })
 }
@@ -489,10 +489,12 @@ export default class MonkeyActuator {
 
                                             if (dealInfo.type == 'cheat txin') {
 
-
                                                 let finished = false
                                                 this.cheatExchangeTxInCfm(task, relay, dealInfo)
                                                     .then(() => finished = true)
+                                                    .catch(async (err) => {
+                                                        console.error(err)
+                                                    })
 
                                                 while (finished == false) {
                                                     await delay(100)
@@ -856,15 +858,23 @@ export default class MonkeyActuator {
             dealInfo.business.swap_asset_information.quote.quote_base.lp_bridge_address = dealInfo.business.swap_asset_information.sender
         }
 
-        if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
-            const resp = await Business.transferOutByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
-            task.output = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
-            task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
-        } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-            const resp = await Business.transferOutByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc)
-            task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
-            task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
-        }
+        await retry( async () => {
+            if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+                const resp = await Business.transferOutByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.srcRpc)
+                task.output = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
+                task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
+            } else if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
+                const resp = await Business.transferOutByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc)
+                task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+                task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+            }
+        }, {
+            retries: 5,
+            onRetry: (error, attempt) => {
+                console.log(`retry ${attempt} -- get error -- ${error}`);
+            },
+        })
+
         
         let succeed = false
         
@@ -923,15 +933,21 @@ export default class MonkeyActuator {
         }
 
         try {
-            if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
-                const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
+            await retry( async () => {
+                if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+                    const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.srcRpc)
                 task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
-            } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-                const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc)
-                task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
-            }
-
-                    
+                } else if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
+                    const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc)
+                    task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+                }
+            }, {
+                retries: 5,
+                onRetry: (error, attempt) => {
+                    console.log(`retry ${attempt} -- get error -- ${error}`);
+                },
+            })
+            
             let succeed = false
             
             while (succeed == false) {
@@ -960,54 +976,64 @@ export default class MonkeyActuator {
             throw new Error("business is undefined");
         }
 
-        let agreementReachedTime = dealInfo.business.swap_asset_information.agreement_reached_time * 1000
-        let expectedSingleStepTime = dealInfo.business.swap_asset_information.expected_single_step_time * 1000
-        let tolerantSingleStepTime = dealInfo.business.swap_asset_information.tolerant_single_step_time * 1000
-
-        let timelock = agreementReachedTime + 3 * expectedSingleStepTime + 1 * tolerantSingleStepTime
-        let canDo = false
-        while (canDo == false) {
-            await delay(2000)
-
-            canDo = Date.now() > (timelock + 10 * 1000)
-
-            task.output = `can cheat transfer in confirm: ${canDo}, now: ${Date.now()}, time lock: ${timelock + 10 * 1000}`
-        }
-
-        const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
-        let sender: string | undefined
-        if (businessFull.event_transfer_in && businessFull.event_transfer_in.sender) {
-            sender = businessFull.event_transfer_in.sender
-        }
-        if (sender === undefined) {
-            throw new Error("failed to get sender address")
-        }
-
-        if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'evm') {
-
-            const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc, sender)
-            task.title = `${task.title} -- user cheat confirm in -- ${(resp as ethers.ContractTransactionResponse).hash}`
-        } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'solana') {
-
-            const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, sender)
-            task.title = `${task.title} -- user cheat confirm in -- ${(resp as ResponseSolana).txHash}`
-        }
-
-        let succeed = false
-        while (succeed == false) {
-            await delay(2000)
-            const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
-            task.output = `waiting... cheat transfer in confirm: ${resp.transfer_in_confirm_id}`
-            succeed = resp.transfer_in_confirm_id > 0
-
-            if (succeed) {
-                task.output = `cheat transfer in confirm is on chain successfully`
+        try {
+            let agreementReachedTime = dealInfo.business.swap_asset_information.agreement_reached_time * 1000
+            let expectedSingleStepTime = dealInfo.business.swap_asset_information.expected_single_step_time * 1000
+            let tolerantSingleStepTime = dealInfo.business.swap_asset_information.tolerant_single_step_time * 1000
+    
+            let timelock = agreementReachedTime + 3 * expectedSingleStepTime + 1 * tolerantSingleStepTime
+            let canDo = false
+            while (canDo == false) {
+                await delay(2000)
+    
+                canDo = Date.now() > (timelock + 10 * 1000)
+    
+                task.output = `can cheat transfer in confirm: ${canDo}, now: ${Date.now()}, time lock: ${timelock + 10 * 1000}`
             }
+    
+            const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
+            let sender: string | undefined
+            if (businessFull.event_transfer_in && businessFull.event_transfer_in.sender) {
+                sender = businessFull.event_transfer_in.sender
+            }
+            if (sender === undefined) {
+                throw new Error("failed to get sender address")
+            }
+    
+            await retry( async () => {
+                if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'evm') {
+        
+                    const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.srcRpc, sender)
+                    task.title = `${task.title} -- user cheat confirm in -- ${(resp as ethers.ContractTransactionResponse).hash}`
+                } else if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'solana') {
+        
+                    const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, sender)
+                    task.title = `${task.title} -- user cheat confirm in -- ${(resp as ResponseSolana).txHash}`
+                }
+            }, {
+                retries: 5,
+                onRetry: (error, attempt) => {
+                    console.log(`retry ${attempt} -- get error -- ${error}`);
+                },
+            })
+    
+            let succeed = false
+            while (succeed == false) {
+                await delay(2000)
+                const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
+                task.output = `waiting... cheat transfer in confirm: ${resp.transfer_in_confirm_id}`
+                succeed = resp.transfer_in_confirm_id > 0
+    
+                if (succeed) {
+                    task.output = `cheat transfer in confirm is on chain successfully`
+                }
+            }
+    
+            await delay(50)
+            resolve()
+        } catch (err) {
+            reject(err)
         }
-
-        await delay(50)
-
-        resolve()
     })
 
     taskExchangeTxInCfm = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
@@ -1083,15 +1109,22 @@ export default class MonkeyActuator {
             task.output = `can refund: ${canDo}, now: ${Date.now()}, time lock: ${dealInfo.business.swap_asset_information.earliest_refund_time * 1000 + 10 * 1000}`
         }
 
-        if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
-            const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network, dealInfo.srcRpc)
-            task.output = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
-            task.title = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
-        } else if (utils.GetChainType(dealInfo.business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-            const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc)
-            task.output = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
-            task.title = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
-        }
+        await retry( async () => {
+            if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+                const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.srcRpc)
+                task.output = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
+                task.title = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
+            } else if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
+                const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc)
+                task.output = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
+                task.title = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
+            }
+        }, {
+            retries: 5,
+            onRetry: (error, attempt) => {
+                console.log(`retry ${attempt} -- get error -- ${error}`);
+            },
+        })
 
         await delay(50)
 
