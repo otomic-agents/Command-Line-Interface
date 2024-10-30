@@ -428,7 +428,11 @@ export default class MonkeyActuator {
                                     .then(() => finished = true)
                                     .catch(async (err) => {
                                         task.output = err
-                                        await this.callWebHookFailed(task, relay, dealInfo)
+                                        if ((err as string).includes("Insufficient balance: The destination token balance is less than the required amount")) {
+                                            await this.callWebHookSucceed(task, relay, dealInfo)
+                                        } else {
+                                            await this.callWebHookFailed(task, relay, dealInfo)
+                                        }
                                     })
                                 while (finished == false) {
                                     await delay(100)
