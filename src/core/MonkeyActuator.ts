@@ -429,7 +429,7 @@ export default class MonkeyActuator {
                                     .catch(async (err) => {
                                         task.output = err
                                         if ((err as string).includes("Insufficient balance: The destination token balance is less than the required amount")) {
-                                            await this.callWebHookSucceed(task, relay, dealInfo)
+                                            await this.callWebHookSucceed(task, relay, dealInfo, err)
                                         } else {
                                             await this.callWebHookFailed(task, relay, dealInfo)
                                         }
@@ -616,7 +616,7 @@ export default class MonkeyActuator {
         }
     })
 
-    callWebHookSucceed = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
+    callWebHookSucceed = (task: any, relay: Relay, dealInfo: DealInfo, note?: string) => new Promise<void>(async (resolve, reject) => {
         if (this.config.webhook != undefined) {
 
             let swapInfo = dealInfo.business?.swap_asset_information
@@ -634,7 +634,8 @@ export default class MonkeyActuator {
                 type: `test flow: ${dealInfo.type}`,
                 businessHash: dealInfo.business?.hash,
                 swapDetail: objectToString(rest2),
-                socketId: dealInfo.socketId
+                socketId: dealInfo.socketId,
+                note: note || '',
             })
 
             resolve()
