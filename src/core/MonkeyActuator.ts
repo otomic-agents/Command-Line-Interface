@@ -349,19 +349,19 @@ export default class MonkeyActuator {
                         if (this.taskList != undefined) {
 
                             if (dealInfo.step == Step.UserTransferOut) {
-                                task.output = `transfer out is failed to on chain`
-                                await this.callWebHookFailed(task, relay, dealInfo)
-                            }
-
-                            if (dealInfo.step == Step.LpTransferIn) {
                                 if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
                                     await this.taskExchangeTxOutRefund(task, dealInfo)
                                     await this.callWebHookSucceed(task, relay, dealInfo)
-                                } else {
-                                    await this.taskExchangeTxOutRefund(task, dealInfo)
-                                    task.output = "cannot get lp tx in, going to refund tx out"
+                                } else {                                    
+                                    task.output = `transfer out is failed to on chain`
                                     await this.callWebHookFailed(task, relay, dealInfo)
                                 }
+                            }
+
+                            if (dealInfo.step == Step.LpTransferIn) {
+                                await this.taskExchangeTxOutRefund(task, dealInfo)
+                                task.output = "cannot get lp tx in, going to refund tx out"
+                                await this.callWebHookFailed(task, relay, dealInfo)
                             }
 
                             if (dealInfo.step == Step.UserConfirmOut) {
