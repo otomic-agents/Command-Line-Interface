@@ -769,21 +769,26 @@ export default class MonkeyActuator {
         const askTime = Date.now()
         task.output = 'ask...'
 
+        let gotQuote = false
         relay.ask({
             bridge: dealInfo.bridge,
             amount: dealInfo.amount
         }, {
             OnQuote: (quote: Quote) => {
-                console.log(quote)
-                if (this.config.lp == undefined || this.config.lp == '') {
-                    dealInfo.quote = quote
-                } else {
-                    if (quote.lp_info.name == this.config.lp) {
+                console.log(`got quote`, gotQuote)
+                if (!gotQuote) {
+                    console.log(quote)
+                    if (this.config.lp == undefined || this.config.lp == '') {
                         dealInfo.quote = quote
+                    } else {
+                        if (quote.lp_info.name == this.config.lp) {
+                            dealInfo.quote = quote
+                        }
                     }
-                }
-                if (dealInfo.quote != undefined) {
-                    askFinished = true
+                    if (dealInfo.quote != undefined) {
+                        askFinished = true
+                        gotQuote = true
+                    }
                 }
             }
         })
