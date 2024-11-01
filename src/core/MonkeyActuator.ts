@@ -348,34 +348,39 @@ export default class MonkeyActuator {
 
                         if (this.taskList != undefined) {
 
-                            if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
-                                await this.taskExchangeTxOutRefund(task, dealInfo)
-                                await this.callWebHookSucceed(task, relay, dealInfo)
-                            } else {
+                            if (dealInfo.step == Step.UserTransferOut) {
+                                task.output = `transfer out is failed to on chain`
+                                await this.callWebHookFailed(task, relay, dealInfo)
+                            }
 
-                                if (dealInfo.step == Step.UserTransferOut) {
-                                    task.output = `transfer out is failed to on chain`
-                                    await this.callWebHookFailed(task, relay, dealInfo)
-                                }
-    
-                                if (dealInfo.step == Step.LpTransferIn) {
+                            if (dealInfo.step == Step.LpTransferIn) {
+                                if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
+                                    await this.taskExchangeTxOutRefund(task, dealInfo)
+                                    await this.callWebHookSucceed(task, relay, dealInfo)
+                                } else {
                                     await this.taskExchangeTxOutRefund(task, dealInfo)
                                     task.output = "cannot get lp tx in, going to refund tx out"
                                     await this.callWebHookFailed(task, relay, dealInfo)
                                 }
+                            }
 
-                                if (dealInfo.step == Step.UserConfirmOut) {
-                                    await this.taskExchangeTxOutRefund(task, dealInfo)
-                                    task.output = "confirm out is failed on chain, going to refund tx out"
-                                    await this.callWebHookFailed(task, relay, dealInfo)
-                                }
-    
-                                if (dealInfo.type == 'cheat txin' && dealInfo.step == Step.LpConfirmIn) {
+                            if (dealInfo.step == Step.UserConfirmOut) {
+                                await this.taskExchangeTxOutRefund(task, dealInfo)
+                                task.output = "confirm out is failed on chain, going to refund tx out"
+                                await this.callWebHookFailed(task, relay, dealInfo)
+                            }
+
+                            if (dealInfo.step == Step.LpConfirmIn) {
+
+                                if (dealInfo.type == 'cheat txin') {
                                     await this.taskExchangeTxOutRefund(task, dealInfo)
                                     task.output = "relay tx out confirm - cannot get transfer out confirm event from relay at task timeout -- going to refund tx out"
                                     await this.callWebHookFailed(task, relay, dealInfo)
-                                }   
-                            }
+                                } else {
+                                    task.output = "cannot get transfer in confirm event from lp at task timeout -- something wrong"
+                                    await this.callWebHookFailed(task, relay, dealInfo)
+                                }
+                            }  
 
                             if (dealInfo.type?.startsWith('cheat') && dealInfo.complaint == true) {
                                 await this.taskExchangeComplaint(task, dealInfo)
