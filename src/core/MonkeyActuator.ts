@@ -651,7 +651,7 @@ export default class MonkeyActuator {
         if (this.config.webhook != undefined) {
 
             if (!dealInfo.business) {
-                return await needle('post', this.config.webhook, {
+                await needle('post', this.config.webhook, {
                     state: 'failed',
                     time: getFormattedDateTime(),
                     network: this.config.network,
@@ -666,6 +666,8 @@ export default class MonkeyActuator {
                     swapDetail: '',
                     socketId: dealInfo.socketId
                 })
+
+                return resolve()
             }
 
             let swapInfo = dealInfo.business.swap_asset_information
@@ -775,7 +777,7 @@ export default class MonkeyActuator {
             amount: dealInfo.amount
         }, {
             OnQuote: (quote: Quote) => {
-                console.log(`got quote`, gotQuote)
+                console.log(`got quote already? ${gotQuote ? "yes, then skip it" : "no, then take the quote"}`)
                 if (!gotQuote) {
                     console.log(quote)
                     if (this.config.lp == undefined || this.config.lp == '') {
