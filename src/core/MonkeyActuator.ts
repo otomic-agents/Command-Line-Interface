@@ -777,9 +777,9 @@ export default class MonkeyActuator {
             amount: dealInfo.amount
         }, {
             OnQuote: (quote: Quote) => {
+                console.log('get new quote', quote)
                 console.log(`got quote already? ${gotQuote ? "yes, then skip it" : "no, then take the quote"}`)
                 if (!gotQuote) {
-                    console.log(quote)
                     if (this.config.lp == undefined || this.config.lp == '') {
                         dealInfo.quote = quote
                     } else {
