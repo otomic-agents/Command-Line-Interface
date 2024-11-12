@@ -29,6 +29,8 @@ export default class Swap extends Command {
     privateKeyForSend: Flags.string({char: 's', description: 'your wallet private key for send src token'}),
 
     to: Flags.string({char: 't', description: 'your wallet address for receiving token'}),
+
+    useMaximumGasPriceAtMost: Flags.boolean({char: 'g', description: 'use the defined maximum gas price if exceeds. usd -g if want to enable it'}),
   }
 
   public async run(): Promise<void> {
@@ -42,8 +44,9 @@ export default class Swap extends Command {
     let privateKeyForSign = flags.privateKeyForSign
     let privateKeyForSend = flags.privateKeyForSend
     let receivingAddress = flags.to
+    let useMaximumGasPriceAtMost = flags.useMaximumGasPriceAtMost
 
-    const swapActuator = new SwapActuator(relayUrl, network, chainRpc, bridgeName, amount, privateKeyForSign, privateKeyForSend, receivingAddress)
+    const swapActuator = new SwapActuator(relayUrl, network, chainRpc, bridgeName, amount, privateKeyForSign, privateKeyForSend, receivingAddress, useMaximumGasPriceAtMost)
     const resp = await swapActuator.run()
     console.log(resp)
     

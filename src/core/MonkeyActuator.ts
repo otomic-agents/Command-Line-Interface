@@ -21,9 +21,9 @@ async function getBusinessRetry(relay: Relay, businessHash: string) {
             }, {
             retries: 5,
             onRetry: (error, attempt) => {
-                    console.log(`retry ${attempt} -- get error -- ${error}`);
-                },
-            }
+                console.log(`retry ${attempt} -- get error -- ${error}`);
+            },
+        }
         )
     })
 }
@@ -37,9 +37,9 @@ async function getBusinessFullRetry(relay: Relay, businessHash: string) {
             }, {
             retries: 5,
             onRetry: (error, attempt) => {
-                    console.log(`retry ${attempt} -- get error -- ${error}`);
-                },
-            }
+                console.log(`retry ${attempt} -- get error -- ${error}`);
+            },
+        }
         )
     })
 }
@@ -96,6 +96,8 @@ interface Config {
     network: string
 
     debug: boolean
+
+    useMaximumGasPriceAtMost: boolean
 }
 
 interface DealInfo {
@@ -181,13 +183,14 @@ export default class MonkeyActuator {
         lp: '',
         network: '',
         rpcs: {},
-        debug: false
+        debug: false,
+        useMaximumGasPriceAtMost: false
     }
 
     constructor(interval: string | undefined, relay: string | undefined, amount: string | undefined,
         bridge: string | undefined, privateKey: string | undefined, solanaPrivateKey: string | undefined, webhook: string | undefined,
         type: string | undefined, complaint: string | undefined, lp: string | undefined,
-        network: string | undefined, rpcs: string | undefined, receivingAddress: string | undefined, solanaReceivingAddress: string | undefined, debug: string | undefined) {
+        network: string | undefined, rpcs: string | undefined, receivingAddress: string | undefined, solanaReceivingAddress: string | undefined, debug: boolean | undefined, useMaximumGasPriceAtMost: boolean | undefined) {
 
         this.interval = interval
         this.relay = relay
@@ -204,6 +207,7 @@ export default class MonkeyActuator {
         this.receivingAddress = receivingAddress
         this.solanaReceivingAddress = solanaReceivingAddress
         this.config.debug = debug ? true : false
+        this.config.useMaximumGasPriceAtMost = useMaximumGasPriceAtMost ? true: false
     }
 
     run = () => new Promise<void>(async (resolve, reject) => {
@@ -309,7 +313,7 @@ export default class MonkeyActuator {
             console.error(error)
             process.exit(1)
         });
-        
+
         process.on('unhandledRejection', async (reason: any, promise: Promise<any>) => {
             console.warn(`got unhandledRejection`, reason)
             if (reason.message == "tasks finished") {
@@ -352,7 +356,7 @@ export default class MonkeyActuator {
                                 if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
                                     await this.taskExchangeTxOutRefund(task, dealInfo)
                                     await this.callWebHookSucceed(task, relay, dealInfo)
-                                } else {                                    
+                                } else {
                                     task.output = `transfer out is failed to on chain`
                                     await this.callWebHookFailed(task, relay, dealInfo)
                                 }
@@ -380,9 +384,9 @@ export default class MonkeyActuator {
                                     task.output = "cannot get transfer in confirm event from lp at task timeout -- something wrong"
                                     await this.callWebHookFailed(task, relay, dealInfo)
                                 }
-                            }  
+                            }
 
-                            if (dealInfo.type?.startsWith('cheat') && dealInfo.complaint == true) {
+                            if (dealInfo.business && dealInfo.type?.startsWith('cheat') && dealInfo.complaint == true) {
                                 await this.taskExchangeComplaint(task, dealInfo)
                             }
                         }
@@ -436,7 +440,7 @@ export default class MonkeyActuator {
                                         if (err.message.includes("Insufficient balance: The destination token balance is less than the required amount")) {
                                             await this.callWebHookSucceed(task, relay, dealInfo, err.message)
                                         } else {
-                                            await this.callWebHookFailed(task, relay, dealInfo)
+                                            throw err
                                         }
                                     })
                                 while (finished == false) {
@@ -651,12 +655,13 @@ export default class MonkeyActuator {
         if (this.config.webhook != undefined) {
 
             if (!dealInfo.business) {
+                let bridgeInfo = dealInfo.bridge ? `${dealInfo.bridge.src_chain_id}-${dealInfo.bridge.src_token}--->${dealInfo.bridge.dst_chain_id}-${dealInfo.bridge.dst_token}` : ''
                 await needle('post', this.config.webhook, {
                     state: 'failed',
                     time: getFormattedDateTime(),
                     network: this.config.network,
                     relay: relay.relayUrl,
-                    bridge: `${dealInfo.bridge!.src_chain_id}-${dealInfo.bridge!.src_token}--->${dealInfo.bridge!.dst_chain_id}-${dealInfo.bridge!.dst_token}`,
+                    bridge: bridgeInfo,
                     sender: dealInfo.sender,
                     amount: dealInfo.amount,
                     type: `test flow: ${dealInfo.type}`,
@@ -813,9 +818,9 @@ export default class MonkeyActuator {
         try {
             dealInfo.srcRpc = this.config.rpcs[utils.GetChainName(dealInfo.quote.quote_base.bridge.src_chain_id).toLowerCase()]
             dealInfo.dstRpc = this.config.rpcs[utils.GetChainName(dealInfo.quote.quote_base.bridge.dst_chain_id).toLowerCase()]
-    
+
             task.output = 'submitting...'
-    
+
             let privateKey = ''
             if (utils.GetChainType(dealInfo.quote.quote_base.bridge.src_chain_id) == 'evm') {
                 privateKey = this.config.privateKey
@@ -824,33 +829,33 @@ export default class MonkeyActuator {
                 privateKey = this.config.solanaPrivateKey
                 dealInfo.sender = this.config.solanaSendingAddress
             }
-    
+
             let receivingAddress = ''
             if (utils.GetChainType(dealInfo.quote.quote_base.bridge.dst_chain_id) == 'evm') {
                 receivingAddress = this.config.receivingAddress
             } else if (utils.GetChainType(dealInfo.quote.quote_base.bridge.dst_chain_id) == 'solana') {
                 receivingAddress = this.config.solanaReceivingAddress
             }
-    
+
             dealInfo.signData =
                 await Business.signQuoteByPrivateKey(
                     this.config.network, dealInfo.quote, privateKey, dealInfo.amount, 0,
                     receivingAddress, undefined, undefined, undefined, dealInfo.srcRpc, dealInfo.dstRpc)
-    
+
             dealInfo.business = await relay.swap(dealInfo.quote, dealInfo.signData.signData, dealInfo.signData.signed)
-    
+
             if (dealInfo.business == undefined) {
                 throw new Error('failed to get business as relay returned a undefined due to unknown reason');
             }
-            
+
             if (dealInfo.business.locked == false) {
                 throw new Error(`lp lock failed: ${dealInfo.business.lock_message}`);
             }
             console.log(`dealInfo.business`, dealInfo.business)
             console.log(`dealInfo.business.swap_asset_information.quote.quote_base`, dealInfo.business.swap_asset_information.quote.quote_base)
-    
+
             task.title = `${task.title} -- (bidid:${dealInfo.business.hash})`
-    
+
             await delay(50)
             resolve()
         } catch (err) {
@@ -875,13 +880,13 @@ export default class MonkeyActuator {
             dealInfo.business.swap_asset_information.quote.quote_base.lp_bridge_address = dealInfo.business.swap_asset_information.sender
         }
 
-        await retry( async () => {
+        await retry(async () => {
             if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
-                const resp = await Business.transferOutByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.srcRpc)
+                const resp = await Business.transferOutByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.srcRpc, this.config.useMaximumGasPriceAtMost)
                 task.output = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
                 task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
             } else if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-                const resp = await Business.transferOutByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc)
+                const resp = await Business.transferOutByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, this.config.useMaximumGasPriceAtMost)
                 task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
                 task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
             }
@@ -892,9 +897,9 @@ export default class MonkeyActuator {
             },
         })
 
-        
+
         let succeed = false
-        
+
         while (succeed == false) {
             await delay(2000)
             const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
@@ -950,12 +955,12 @@ export default class MonkeyActuator {
         }
 
         try {
-            await retry( async () => {
+            await retry(async () => {
                 if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
-                    const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.srcRpc)
-                task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
+                    const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.srcRpc, this.config.useMaximumGasPriceAtMost)
+                    task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
                 } else if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-                    const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc)
+                    const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, this.config.useMaximumGasPriceAtMost)
                     task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
                 }
             }, {
@@ -964,9 +969,9 @@ export default class MonkeyActuator {
                     console.log(`retry ${attempt} -- get error -- ${error}`);
                 },
             })
-            
+
             let succeed = false
-            
+
             while (succeed == false) {
                 await delay(2000)
                 const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
@@ -997,17 +1002,17 @@ export default class MonkeyActuator {
             let agreementReachedTime = dealInfo.business.swap_asset_information.agreement_reached_time * 1000
             let expectedSingleStepTime = dealInfo.business.swap_asset_information.expected_single_step_time * 1000
             let tolerantSingleStepTime = dealInfo.business.swap_asset_information.tolerant_single_step_time * 1000
-    
+
             let timelock = agreementReachedTime + 3 * expectedSingleStepTime + 1 * tolerantSingleStepTime
             let canDo = false
             while (canDo == false) {
                 await delay(2000)
-    
+
                 canDo = Date.now() > (timelock + 10 * 1000)
-    
+
                 task.output = `can cheat transfer in confirm: ${canDo}, now: ${Date.now()}, time lock: ${timelock + 10 * 1000}`
             }
-    
+
             const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
             let sender: string | undefined
             if (businessFull.event_transfer_in && businessFull.event_transfer_in.sender) {
@@ -1016,15 +1021,15 @@ export default class MonkeyActuator {
             if (sender === undefined) {
                 throw new Error("failed to get sender address")
             }
-    
-            await retry( async () => {
+
+            await retry(async () => {
                 if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'evm') {
-        
-                    const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.dstRpc, sender)
+
+                    const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.dstRpc, sender, this.config.useMaximumGasPriceAtMost)
                     task.title = `${task.title} -- user cheat confirm in -- ${(resp as ethers.ContractTransactionResponse).hash}`
                 } else if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'solana') {
-        
-                    const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.dstRpc, sender)
+
+                    const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.dstRpc, sender, this.config.useMaximumGasPriceAtMost)
                     task.title = `${task.title} -- user cheat confirm in -- ${(resp as ResponseSolana).txHash}`
                 }
             }, {
@@ -1033,19 +1038,19 @@ export default class MonkeyActuator {
                     console.log(`retry ${attempt} -- get error -- ${error}`);
                 },
             })
-    
+
             let succeed = false
             while (succeed == false) {
                 await delay(2000)
                 const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
                 task.output = `waiting... cheat transfer in confirm: ${resp.transfer_in_confirm_id}`
                 succeed = resp.transfer_in_confirm_id > 0
-    
+
                 if (succeed) {
                     task.output = `cheat transfer in confirm is on chain successfully`
                 }
             }
-    
+
             await delay(50)
             resolve()
         } catch (err) {
@@ -1126,13 +1131,13 @@ export default class MonkeyActuator {
             task.output = `can refund: ${canDo}, now: ${Date.now()}, time lock: ${dealInfo.business.swap_asset_information.earliest_refund_time * 1000 + 10 * 1000}`
         }
 
-        await retry( async () => {
+        await retry(async () => {
             if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
-                const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.srcRpc)
+                const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.srcRpc, this.config.useMaximumGasPriceAtMost)
                 task.output = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
                 task.title = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
             } else if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-                const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc)
+                const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, this.config.useMaximumGasPriceAtMost)
                 task.output = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
                 task.title = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
             }
