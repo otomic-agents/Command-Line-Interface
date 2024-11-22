@@ -1,4 +1,4 @@
-import { Quote, Relay, TranslatedBridge, utils } from 'otmoic-software-development-kit';
+import { Quote, Relay, TranslatedBridge, utils } from 'otmoic-sdk';
 import GetBridgeActuator from './GetBridgeActuator'
 import { prompt } from 'enquirer';
 import { Listr, delay } from 'listr2';

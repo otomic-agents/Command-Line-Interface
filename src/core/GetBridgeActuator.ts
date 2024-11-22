@@ -1,7 +1,7 @@
-import { Bridge, Relay, assistive } from 'otmoic-software-development-kit'
+import { Bridge, Relay, assistive } from 'otmoic-sdk'
 import Table from 'cli-table3'
 import { delay, Listr } from 'listr2';
-import { TranslatedBridge } from 'otmoic-software-development-kit';
+import { TranslatedBridge } from 'otmoic-sdk';
 
 export default class GetBridgeActuator {
 

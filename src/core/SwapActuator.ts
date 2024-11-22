@@ -2,7 +2,7 @@ import { Listr, delay } from "listr2"
 import AskActuator from "./AskActuator"
 import { prompt } from 'enquirer';
 import { ethers } from "ethers";
-import { PreBusiness, Quote, Relay, SignData, business as Business, evm, utils, ResponseSolana, ResponseTransferOut } from "otmoic-software-development-kit";
+import { PreBusiness, Quote, Relay, SignData, business as Business, evm, utils, ResponseSolana, ResponseTransferOut } from "otmoic-sdk";
 
 export default class SwapActuator {
 

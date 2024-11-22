@@ -1,8 +1,8 @@
 {
-  "name": "otmoiccli",
+  "name": "otmoic-cli",
   "description": "otmoic-cli has functions such as generating account reports, querying quotes, and making exchanges.",
   "version": "0.0.6",
-  "author": "bytetrade",
+  "author": "otmoic",
   "bin": {
     "otmoiccli": "./bin/run.js",
     "Command-Line-Interface": "./bin/run.js"
@@ -18,7 +18,6 @@
     "level": "^8.0.1",
     "listr2": "^8.2.1",
     "needle": "^3.3.1",
-    "otmoic-software-development-kit": "^0.0.86",
     "puppeteer": "^22.10.0",
     "superagent": "^10.1.0"
   },
@@ -37,6 +36,7 @@
     "eslint-config-prettier": "^9",
     "mocha": "^10",
     "oclif": "^4",
+    "otmoic-sdk": "^0.0.86",
     "shx": "^0.3.3",
     "ts-node": "^10",
     "typescript": "^5"

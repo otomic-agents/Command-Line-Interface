@@ -2,7 +2,7 @@ import { prompt } from 'enquirer';
 import { ethers, ZeroAddress } from "ethers";
 import { Keypair } from '@solana/web3.js';
 import { Listr, delay, PRESET_TIMESTAMP } from 'listr2';
-import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, business as Business, ResponseTransferOut, ResponseSolana, Business as BusinessType, BusinessFullData } from 'otmoic-software-development-kit';
+import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, business as Business, ResponseTransferOut, ResponseSolana, Business as BusinessType, BusinessFullData } from 'otmoic-sdk';
 import Bignumber from 'bignumber.js'
 import needle from 'needle'
 import retry from 'async-retry';
