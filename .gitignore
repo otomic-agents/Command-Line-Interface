@@ -15,3 +15,7 @@ pnpm-lock.yaml
 logs
 
 *.env.sh
+monkey-stat
+
+scripts
+env

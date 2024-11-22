@@ -40,7 +40,9 @@ export default class Monkey extends Command {
     
     solanaTo: Flags.string({char: 'S', description: 'your solana address for receiving token'}),
 
-    debug: Flags.string({char: 'd', description: 'output verbose logs for debugging if true, otherwise be false'}),
+    debug: Flags.boolean({char: 'd', description: 'debug flag for output detailed lp. use -d if want to enable it'}),
+    
+    useMaximumGasPriceAtMost: Flags.boolean({char: 'g', description: 'use the defined maximum gas price if exceeds. usd -g if want to enable it'}),
   }
 
   public async run(): Promise<void> {
@@ -61,8 +63,9 @@ export default class Monkey extends Command {
     let receivingAddress = flags.to
     let solanaReceivingAddress = flags.solanaTo
     let debug = flags.debug
+    let useMaximumGasPriceAtMost = flags.useMaximumGasPriceAtMost
 
-    let monkeyActuator = new MonkeyActuator(interval, relay, amount, bridge, privateKey, solanaPrivateKey, webhook, type, complaint, lp, network, chainRpc, receivingAddress, solanaReceivingAddress, debug)
+    let monkeyActuator = new MonkeyActuator(interval, relay, amount, bridge, privateKey, solanaPrivateKey, webhook, type, complaint, lp, network, chainRpc, receivingAddress, solanaReceivingAddress, debug, useMaximumGasPriceAtMost)
     monkeyActuator.run()
 
 

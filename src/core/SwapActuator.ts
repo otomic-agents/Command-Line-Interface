@@ -34,15 +34,16 @@ export default class SwapActuator {
 
     dstRpc: string | undefined
 
-    solanaUuid: string | undefined
+    useMaximumGasPriceAtMost: boolean
 
     constructor (relayUrl: string | undefined, network: string | undefined, rpcs: string | undefined, 
         bridgeName: string | undefined, amount: string | undefined, privateKeyForSign: string | undefined,
-        privateKeyForSend: string | undefined, receivingAddress: string | undefined) {
+        privateKeyForSend: string | undefined, receivingAddress: string | undefined, useMaximumGasPriceAtMost: boolean | undefined) {
 
         this.privateKeyForSign = privateKeyForSign
         this.privateKeyForSend = privateKeyForSend
         this.receivingAddress = receivingAddress
+        this.useMaximumGasPriceAtMost = useMaximumGasPriceAtMost ? true : false
 
         this.askActuator = new AskActuator(relayUrl, network, rpcs, bridgeName, amount)
     }
@@ -176,7 +177,7 @@ export default class SwapActuator {
         this.dstRpc = this.rpcs[utils.GetChainName(this.quote.quote_base.bridge.dst_chain_id).toLowerCase()]
 
         const signData: {signData: SignData, signed: string} = await Business.signQuoteByPrivateKey(this.network, this.quote, this.privateKeyForSign, this.amount, 0, this.receivingAddress, 
-        undefined, this.srcRpc, this.dstRpc)
+        undefined, undefined, undefined, this.srcRpc, this.dstRpc)
 
         resolve(signData)
     })
@@ -281,12 +282,11 @@ export default class SwapActuator {
                         throw new Error("network is undefined");
                     }
 
-                    const resp = await Business.transferOutByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc)
+                    const resp = await Business.transferOutByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc, this.useMaximumGasPriceAtMost)
                     if (utils.GetChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
                         task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
                     } else if (utils.GetChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
                         task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
-                        this.solanaUuid = (resp as ResponseSolana).uuid
                     }
 
                     step = 3
@@ -349,10 +349,10 @@ export default class SwapActuator {
                     }
 
                     if (utils.GetChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
-                        const resp = await Business.transferOutConfirmByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc)
+                        const resp = await Business.transferOutConfirmByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc, this.useMaximumGasPriceAtMost)
                         task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
                     } else if (utils.GetChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-                        const resp = await Business.transferOutConfirmByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc, this.solanaUuid!)
+                        const resp = await Business.transferOutConfirmByPrivateKey(business, this.privateKeyForSend, this.network, this.srcRpc, this.useMaximumGasPriceAtMost)
                         task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
                     }
 
