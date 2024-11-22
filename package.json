@@ -1,7 +1,7 @@
 {
   "name": "otmoic-cli",
   "description": "otmoic-cli has functions such as generating account reports, querying quotes, and making exchanges.",
-  "version": "0.0.6",
+  "version": "0.1.0",
   "author": "otmoic",
   "bin": {
     "otmoiccli": "./bin/run.js",
