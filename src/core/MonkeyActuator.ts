@@ -300,11 +300,6 @@ export default class MonkeyActuator {
                 process.exit(0)
             }
 
-            if (error.message == "no bridge can test") {
-                console.log("no bridge can test")
-                process.exit(0)
-            }
-
             let task = {
                 title: error.name,
                 output: error.message + "==>" + error.stack
@@ -318,11 +313,6 @@ export default class MonkeyActuator {
             console.warn(`got unhandledRejection`, reason)
             if (reason.message == "tasks finished") {
                 console.log("tasks finished")
-                process.exit(0)
-            }
-
-            if (reason.message == "no bridge can test") {
-                console.log("no bridge can test")
                 process.exit(0)
             }
 
@@ -732,7 +722,7 @@ export default class MonkeyActuator {
         task.output = `enough balance bridge size: ${enoughList.length}`
 
         if (enoughList.length == 0) {
-            throw new Error("no bridge can test");
+            throw new Error("monkey has no balance on bridges");
         }
 
         dealInfo.bridge = enoughList[getRandomNumberInRange(0, enoughList.length - 1)]
