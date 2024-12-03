@@ -2,33 +2,48 @@ import {Args, Command, Flags} from '@oclif/core'
 import MonkeyActuator from '../core/MonkeyActuator'
 
 export default class Monkey extends Command {
-  static override args = {
-  }
+  static override args = {}
 
   static override description = 'describe the command here'
 
-  static override examples = [
-    '<%= config.bin %> <%= command.id %>',
-  ]
+  static override examples = ['<%= config.bin %> <%= command.id %>']
 
   static override flags = {
-    interval: Flags.string({char: 'i', description: "the interval between the two monkeys' departures is random within a certain range, in the format of [min]-[max]"}),
+    interval: Flags.string({
+      char: 'i',
+      description:
+        "the interval between the two monkeys' departures is random within a certain range, in the format of [min]-[max]",
+    }),
 
     relay: Flags.string({char: 'r', description: 'relay url'}),
 
-    amount: Flags.string({char: 'a', description: 'the per mille (num over 1000) of srctokens exchanged (base of balance) in each test, random within a specific range, in the format of [min]-[max]'}),
+    amount: Flags.string({
+      char: 'a',
+      description:
+        'the per mille (num over 1000) of srctokens exchanged (base of balance) in each test, random within a specific range, in the format of [min]-[max]',
+    }),
 
-    bridge: Flags.string({char: 'b', description: 'the bridges to be tested are separated by commas. If it is empty, there is no limit.'}),
+    bridge: Flags.string({
+      char: 'b',
+      description: 'the bridges to be tested are separated by commas. If it is empty, there is no limit.',
+    }),
 
     privateKey: Flags.string({char: 'p', description: 'evm private key used during testing'}),
-    
+
     solanaPrivateKey: Flags.string({char: 's', description: 'solana private key used during testing'}),
 
     webhook: Flags.string({char: 'w', description: 'webhook address for receiving execution reports'}),
 
-    type: Flags.string({char: 't', description: 'the test type, separated by commas, [succeed] or [refund] or [cheat amount] or [cheat address] or [cheat txin]'}),
+    type: Flags.string({
+      char: 't',
+      description:
+        'the test type, separated by commas, [succeed] or [refund] or [cheat amount] or [cheat address] or [cheat txin]',
+    }),
 
-    complaint: Flags.string({char: 'C', description: 'do complaint, enter [true] or [false], if "type" is not "succeed", complaint can be run'}),
+    complaint: Flags.string({
+      char: 'C',
+      description: 'do complaint, enter [true] or [false], if "type" is not "succeed", complaint can be run',
+    }),
 
     lp: Flags.string({char: 'l', description: 'the lp name to be tested. no restriction if empty.'}),
 
@@ -37,12 +52,15 @@ export default class Monkey extends Command {
     chainRpc: Flags.string({char: 'c', description: 'rpc config json, like: { bsc: "<RPC_BSC>" }'}),
 
     to: Flags.string({char: 'T', description: 'your evm address for receiving token'}),
-    
+
     solanaTo: Flags.string({char: 'S', description: 'your solana address for receiving token'}),
 
     debug: Flags.boolean({char: 'd', description: 'debug flag for output detailed lp. use -d if want to enable it'}),
-    
-    useMaximumGasPriceAtMost: Flags.boolean({char: 'g', description: 'use the defined maximum gas price if exceeds. usd -g if want to enable it'}),
+
+    useMaximumGasPriceAtMost: Flags.boolean({
+      char: 'g',
+      description: 'use the defined maximum gas price if exceeds. usd -g if want to enable it',
+    }),
   }
 
   public async run(): Promise<void> {
@@ -65,9 +83,24 @@ export default class Monkey extends Command {
     let debug = flags.debug
     let useMaximumGasPriceAtMost = flags.useMaximumGasPriceAtMost
 
-    let monkeyActuator = new MonkeyActuator(interval, relay, amount, bridge, privateKey, solanaPrivateKey, webhook, type, complaint, lp, network, chainRpc, receivingAddress, solanaReceivingAddress, debug, useMaximumGasPriceAtMost)
+    let monkeyActuator = new MonkeyActuator(
+      interval,
+      relay,
+      amount,
+      bridge,
+      privateKey,
+      solanaPrivateKey,
+      webhook,
+      type,
+      complaint,
+      lp,
+      network,
+      chainRpc,
+      receivingAddress,
+      solanaReceivingAddress,
+      debug,
+      useMaximumGasPriceAtMost,
+    )
     monkeyActuator.run()
-
-
   }
 }

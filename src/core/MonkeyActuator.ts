@@ -1,1545 +1,1713 @@
-import { prompt } from 'enquirer';
-import { ethers, ZeroAddress } from "ethers";
-import { Keypair } from '@solana/web3.js';
-import { Listr, delay, PRESET_TIMESTAMP } from 'listr2';
-import { Bridge, PreBusiness, Quote, Relay, SignData, assistive, evm, utils, business as Business, ResponseTransferOut, ResponseSolana, Business as BusinessType, BusinessFullData } from 'otmoic-software-development-kit';
+import {prompt} from 'enquirer'
+import {ethers, ZeroAddress} from 'ethers'
+import {Keypair} from '@solana/web3.js'
+import {Listr, delay, PRESET_TIMESTAMP} from 'listr2'
+import {
+  Bridge,
+  PreBusiness,
+  Quote,
+  Relay,
+  SwapSignData,
+  assistive,
+  utils,
+  business as Business,
+  ResponseTransferOut,
+  ResponseSolana,
+  Business as BusinessType,
+  BusinessFullData,
+  NetworkType,
+  SwapSignedData,
+} from 'otmoic-sdk'
 import Bignumber from 'bignumber.js'
 import needle from 'needle'
-import retry from 'async-retry';
-import { objectToString, getFormattedDateTime, sanitizeForJSON } from '../utils/flattenObject';
+import retry from 'async-retry'
+import {objectToString, getFormattedDateTime, sanitizeForJSON} from '../utils/flattenObject'
 
 function getRandomNumberInRange(n: number, m: number): number {
-    return Math.floor(Math.random() * (m - n + 1) + n);
+  return Math.floor(Math.random() * (m - n + 1) + n)
 }
 
 async function getBusinessRetry(relay: Relay, businessHash: string) {
-    return new Promise<BusinessType>((resolve, reject) => {
-        retry(
-            async () => {
-                let business = await relay.getBusiness(businessHash)
-                resolve(business)
-            }, {
-            retries: 5,
-            onRetry: (error, attempt) => {
-                console.log(`retry ${attempt} -- get error -- ${error}`);
-            },
-        }
-        )
-    })
+  return new Promise<BusinessType>((resolve, reject) => {
+    retry(
+      async () => {
+        let business = (await relay.getBusiness(businessHash)) as BusinessType
+        resolve(business)
+      },
+      {
+        retries: 5,
+        onRetry: (error, attempt) => {
+          console.log(`retry ${attempt} -- get error -- ${error}`)
+        },
+      },
+    )
+  })
 }
 
 async function getBusinessFullRetry(relay: Relay, businessHash: string) {
-    return new Promise<BusinessFullData>((resolve, reject) => {
-        retry(
-            async () => {
-                let businessFull = await relay.getBusinessFull(businessHash)
-                resolve(businessFull)
-            }, {
-            retries: 5,
-            onRetry: (error, attempt) => {
-                console.log(`retry ${attempt} -- get error -- ${error}`);
-            },
-        }
-        )
-    })
+  return new Promise<BusinessFullData>((resolve, reject) => {
+    retry(
+      async () => {
+        let businessFull = (await relay.getBusiness(businessHash, {detailed: true})) as BusinessFullData
+        resolve(businessFull)
+      },
+      {
+        retries: 5,
+        onRetry: (error, attempt) => {
+          console.log(`retry ${attempt} -- get error -- ${error}`)
+        },
+      },
+    )
+  })
 }
 
 enum Step {
-    WaitTransferOut = 1,
-    UserTransferOut = 2,
-    LpTransferIn = 3,
-    UserConfirmOut = 4,
-    LpConfirmIn = 5,
-    UserRefundOut = 6,
-    LpRefundIn = 7,
-    Complaint = 8,
+  WaitTransferOut = 1,
+  UserTransferOut = 2,
+  LpTransferIn = 3,
+  UserConfirmOut = 4,
+  LpConfirmIn = 5,
+  UserRefundOut = 6,
+  LpRefundIn = 7,
+  Complaint = 8,
 }
 
 interface Config {
+  intervalMin: number
 
-    intervalMin: number
+  intervalMax: number
 
-    intervalMax: number
+  relayUrl: string
 
-    relayUrl: string
+  rpcs: {
+    [key: string]: string
+  }
 
-    rpcs: {
-        [key: string]: string
-    }
+  amountMin: number
 
-    amountMin: number
+  amountMax: number
 
-    amountMax: number
+  bridges: string[]
 
-    bridges: string[]
+  privateKey: string
 
-    privateKey: string
+  solanaPrivateKey: string
 
-    solanaPrivateKey: string
+  sendingAddress: string
 
-    sendingAddress: string
+  solanaSendingAddress: string
 
-    solanaSendingAddress: string
+  receivingAddress: string
 
-    receivingAddress: string
+  solanaReceivingAddress: string
 
-    solanaReceivingAddress: string
+  webhook: string
 
-    webhook: string
+  type: string[]
 
-    type: string[]
+  complaint: string[]
 
-    complaint: string[]
+  lp: string
 
-    lp: string
+  network: NetworkType | undefined
 
-    network: string
+  debug: boolean
 
-    debug: boolean
-
-    useMaximumGasPriceAtMost: boolean
+  useMaximumGasPriceAtMost: boolean
 }
 
 interface DealInfo {
+  bridge: Bridge | undefined
 
-    bridge: Bridge | undefined
+  amount: string | undefined
 
-    amount: string | undefined
+  sender: string | undefined
 
-    sender: string | undefined
+  type: string | undefined
 
-    type: string | undefined
+  complaint: boolean | undefined
 
-    complaint: boolean | undefined
+  quote: Quote | undefined
 
-    quote: Quote | undefined
+  business: PreBusiness | undefined
 
-    business: PreBusiness | undefined
+  srcRpc: string | undefined
 
-    srcRpc: string | undefined
+  dstRpc: string | undefined
 
-    dstRpc: string | undefined
+  signData: SwapSignedData | undefined
 
-    signData: {
-        signData: SignData,
-        signed: string
-    } | undefined
+  step: number | undefined
 
-    step: number | undefined
-
-    socketId: string | undefined
+  socketId: string | undefined
 }
 
 export default class MonkeyActuator {
+  interval: string | undefined
 
-    interval: string | undefined
+  relay: string | undefined
 
-    relay: string | undefined
+  amount: string | undefined
 
-    amount: string | undefined
+  bridge: string | undefined
 
-    bridge: string | undefined
+  privateKey: string | undefined
 
-    privateKey: string | undefined
+  solanaPrivateKey: string | undefined
 
-    solanaPrivateKey: string | undefined
+  webhook: string | undefined
 
-    webhook: string | undefined
+  type: string | undefined
 
-    type: string | undefined
+  complaint: string | undefined
 
-    complaint: string | undefined
+  lp: string | undefined
 
-    lp: string | undefined
+  network: string | undefined
 
-    network: string | undefined
+  rpcs: {
+    [key: string]: string
+  } = {}
 
-    rpcs: {
-        [key: string]: string
-    } = {}
+  receivingAddress: string | undefined
 
-    receivingAddress: string | undefined
+  solanaReceivingAddress: string | undefined
 
-    solanaReceivingAddress: string | undefined
+  taskList: Listr<any, 'simple' | 'default', 'simple'> | undefined
 
-    taskList: Listr<any, "simple" | "default", "simple"> | undefined
+  config: Config = {
+    intervalMin: 0,
+    intervalMax: 0,
+    relayUrl: '',
+    amountMin: 0,
+    amountMax: 0,
+    bridges: [],
+    privateKey: '',
+    solanaPrivateKey: '',
+    sendingAddress: '',
+    solanaSendingAddress: '',
+    receivingAddress: '',
+    solanaReceivingAddress: '',
+    webhook: '',
+    type: [],
+    complaint: [],
+    lp: '',
+    network: undefined,
+    rpcs: {},
+    debug: false,
+    useMaximumGasPriceAtMost: false,
+  }
 
-    config: Config = {
-        intervalMin: 0,
-        intervalMax: 0,
-        relayUrl: '',
-        amountMin: 0,
-        amountMax: 0,
-        bridges: [],
-        privateKey: '',
-        solanaPrivateKey: '',
-        sendingAddress: '',
-        solanaSendingAddress: '',
-        receivingAddress: '',
-        solanaReceivingAddress: '',
-        webhook: '',
-        type: [],
-        complaint: [],
-        lp: '',
-        network: '',
-        rpcs: {},
-        debug: false,
-        useMaximumGasPriceAtMost: false
-    }
+  constructor(
+    interval: string | undefined,
+    relay: string | undefined,
+    amount: string | undefined,
+    bridge: string | undefined,
+    privateKey: string | undefined,
+    solanaPrivateKey: string | undefined,
+    webhook: string | undefined,
+    type: string | undefined,
+    complaint: string | undefined,
+    lp: string | undefined,
+    network: string | undefined,
+    rpcs: string | undefined,
+    receivingAddress: string | undefined,
+    solanaReceivingAddress: string | undefined,
+    debug: boolean | undefined,
+    useMaximumGasPriceAtMost: boolean | undefined,
+  ) {
+    this.interval = interval
+    this.relay = relay
+    this.amount = amount
+    this.bridge = bridge
+    this.privateKey = privateKey
+    this.solanaPrivateKey = solanaPrivateKey
+    this.webhook = webhook
+    this.type = type
+    this.complaint = complaint
+    this.lp = lp
+    this.network = network
+    this.rpcs = rpcs == undefined ? {} : JSON.parse(rpcs)
+    this.receivingAddress = receivingAddress
+    this.solanaReceivingAddress = solanaReceivingAddress
+    this.config.debug = debug ? true : false
+    this.config.useMaximumGasPriceAtMost = useMaximumGasPriceAtMost ? true : false
+  }
 
-    constructor(interval: string | undefined, relay: string | undefined, amount: string | undefined,
-        bridge: string | undefined, privateKey: string | undefined, solanaPrivateKey: string | undefined, webhook: string | undefined,
-        type: string | undefined, complaint: string | undefined, lp: string | undefined,
-        network: string | undefined, rpcs: string | undefined, receivingAddress: string | undefined, solanaReceivingAddress: string | undefined, debug: boolean | undefined, useMaximumGasPriceAtMost: boolean | undefined) {
+  run = () =>
+    new Promise<void>(async (resolve, reject) => {
+      await this.initNetwork()
+      await this.initRelay()
+      await this.initChainRpc()
+      await this.initInterval()
+      await this.initAmount()
+      await this.initBridge()
+      await this.initPrivateKey()
+      await this.initSolanaPrivateKey()
+      await this.initReceivingAddress()
+      await this.initSolanaReceivingAddress()
+      await this.initWebhook()
+      await this.initType()
+      await this.initLP()
 
-        this.interval = interval
-        this.relay = relay
-        this.amount = amount
-        this.bridge = bridge
-        this.privateKey = privateKey
-        this.solanaPrivateKey = solanaPrivateKey
-        this.webhook = webhook
-        this.type = type
-        this.complaint = complaint
-        this.lp = lp
-        this.network = network
-        this.rpcs = rpcs == undefined ? {} : JSON.parse(rpcs)
-        this.receivingAddress = receivingAddress
-        this.solanaReceivingAddress = solanaReceivingAddress
-        this.config.debug = debug ? true : false
-        this.config.useMaximumGasPriceAtMost = useMaximumGasPriceAtMost ? true: false
-    }
+      console.log('config', this.config)
 
-    run = () => new Promise<void>(async (resolve, reject) => {
-
-        await this.initNetwork()
-        await this.initRelay()
-        await this.initChainRpc()
-        await this.initInterval()
-        await this.initAmount()
-        await this.initBridge()
-        await this.initPrivateKey()
-        await this.initSolanaPrivateKey()
-        await this.initReceivingAddress()
-        await this.initSolanaReceivingAddress()
-        await this.initWebhook()
-        await this.initType()
-        await this.initLP()
-
-        console.log('config', this.config)
-
-        this.tick()
+      this.tick()
     })
 
+  tick = () =>
+    new Promise<void>(async (resolve, reject) => {
+      const relay = new Relay(this.config.relayUrl)
 
-    tick = () => new Promise<void>(async (resolve, reject) => {
+      const dealInfo: DealInfo = {
+        bridge: undefined,
+        amount: undefined,
+        sender: undefined,
+        complaint: undefined,
+        type: undefined,
+        quote: undefined,
+        business: undefined,
+        srcRpc: undefined,
+        dstRpc: undefined,
+        signData: undefined,
+        step: undefined,
+        socketId: undefined,
+      }
 
-        const relay = new Relay(this.config.relayUrl);
+      let concurrentTaskOption: any
+      let orderedTaskOption: any
+      if (this.config.debug) {
+        concurrentTaskOption = {
+          concurrent: true,
+          renderer: 'simple',
+          rendererOptions: {
+            timestamp: PRESET_TIMESTAMP,
+          },
+          exitOnError: true,
+        }
+        orderedTaskOption = {
+          concurrent: false,
+          renderer: 'simple',
+          rendererOptions: {
+            timestamp: PRESET_TIMESTAMP,
+          },
+          exitOnError: true,
+        }
+      } else {
+        concurrentTaskOption = {
+          renderer: 'default',
+          rendererOptions: {
+            collapseSubtasks: false,
+          },
+          exitOnError: true,
+          concurrent: true,
+          showErrorMessage: true,
+          collapseErrors: true,
+        }
+        orderedTaskOption = {
+          renderer: 'default',
+          rendererOptions: {
+            collapseSubtasks: false,
+          },
+          exitOnError: true,
+          concurrent: false,
+          showErrorMessage: true,
+          collapseErrors: true,
+        }
+      }
 
-        const dealInfo: DealInfo = {
-            bridge: undefined,
-            amount: undefined,
-            sender: undefined,
-            complaint: undefined,
-            type: undefined,
-            quote: undefined,
-            business: undefined,
-            srcRpc: undefined,
-            dstRpc: undefined,
-            signData: undefined,
-            step: undefined,
-            socketId: undefined,
+      process.on('uncaughtException', async (error: Error) => {
+        console.warn(`got uncaughtException`, error)
+        if (error.message == 'tasks finished') {
+          console.log('tasks finished')
+          process.exit(0)
         }
 
-        let concurrentTaskOption: any
-        let orderedTaskOption: any
-        if (this.config.debug) {
-            concurrentTaskOption = {
-                concurrent: true,
-                renderer: 'simple',
-                rendererOptions: {
-                    timestamp: PRESET_TIMESTAMP
-                },
-                exitOnError: true
-            }
-            orderedTaskOption = {
-                concurrent: false,
-                renderer: 'simple',
-                rendererOptions: {
-                    timestamp: PRESET_TIMESTAMP
-                },
-                exitOnError: true
-            }
-        } else {
-            concurrentTaskOption = {
-                renderer: 'default',
-                rendererOptions: {
-                    collapseSubtasks: false
-                },
-                exitOnError: true,
-                concurrent: true,
-                showErrorMessage: true,
-                collapseErrors: true
-            }
-            orderedTaskOption = {
-                renderer: 'default',
-                rendererOptions: {
-                    collapseSubtasks: false
-                },
-                exitOnError: true,
-                concurrent: false,
-                showErrorMessage: true,
-                collapseErrors: true
-            }
+        let task = {
+          title: error.name,
+          output: error.message + '==>' + error.stack,
+        }
+        await this.callWebHookFailed(task, relay, dealInfo)
+        console.error(error)
+        process.exit(1)
+      })
+
+      process.on('unhandledRejection', async (reason: any, promise: Promise<any>) => {
+        console.warn(`got unhandledRejection`, reason)
+        if (reason.message == 'tasks finished') {
+          console.log('tasks finished')
+          process.exit(0)
         }
 
-        process.on('uncaughtException', async (error: Error) => {
-            console.warn(`got uncaughtException`, error)
-            if (error.message == "tasks finished") {
-                console.log("tasks finished")
-                process.exit(0)
-            }
+        let task = {
+          title: reason.name,
+          output: reason.message + '==>' + reason.stack,
+        }
+        await this.callWebHookFailed(task, relay, dealInfo)
+        console.error(reason)
+        process.exit(1)
+      })
 
-            let task = {
-                title: error.name,
-                output: error.message + "==>" + error.stack
-            }
-            await this.callWebHookFailed(task, relay, dealInfo)
-            console.error(error)
-            process.exit(1)
-        });
+      try {
+        this.taskList = new Listr(
+          [
+            {
+              title: 'check timeout',
+              enabled: true,
+              task: async (_: any, task: any): Promise<void> => {
+                const interval = getRandomNumberInRange(this.config.intervalMin, this.config.intervalMax)
 
-        process.on('unhandledRejection', async (reason: any, promise: Promise<any>) => {
-            console.warn(`got unhandledRejection`, reason)
-            if (reason.message == "tasks finished") {
-                console.log("tasks finished")
-                process.exit(0)
-            }
+                let startTime = Date.now()
 
-            let task = {
-                title: reason.name,
-                output: reason.message + "==>" + reason.stack
-            }
-            await this.callWebHookFailed(task, relay, dealInfo)
-            console.error(reason)
-            process.exit(1)
-        });
-
-        try {
-            this.taskList = new Listr([
-                {
-                    title: 'check timeout',
-                    enabled: true,
-                    task: async (_: any, task: any): Promise<void> => {
-
-                        const interval = getRandomNumberInRange(this.config.intervalMin, this.config.intervalMax)
-
-                        let startTime = Date.now()
-
-                        while ((startTime + interval * 1000) > Date.now()) {
-                            await delay(1000)
-                        }
-
-                        if (this.taskList != undefined) {
-
-                            if (dealInfo.step == Step.UserTransferOut) {
-                                if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
-                                    await this.taskExchangeTxOutRefund(task, dealInfo)
-                                    await this.callWebHookSucceed(task, relay, dealInfo)
-                                } else {
-                                    task.output = `transfer out is failed to on chain`
-                                    await this.callWebHookFailed(task, relay, dealInfo)
-                                }
-                            }
-
-                            if (dealInfo.step == Step.LpTransferIn) {
-                                await this.taskExchangeTxOutRefund(task, dealInfo)
-                                task.output = "cannot get lp tx in, going to refund tx out"
-                                await this.callWebHookFailed(task, relay, dealInfo)
-                            }
-
-                            if (dealInfo.step == Step.UserConfirmOut) {
-                                await this.taskExchangeTxOutRefund(task, dealInfo)
-                                task.output = "confirm out is failed on chain, going to refund tx out"
-                                await this.callWebHookFailed(task, relay, dealInfo)
-                            }
-
-                            if (dealInfo.step == Step.LpConfirmIn) {
-
-                                if (dealInfo.type == 'cheat txin') {
-                                    await this.taskExchangeTxOutRefund(task, dealInfo)
-                                    task.output = "relay tx out confirm - cannot get transfer out confirm event from relay at task timeout -- going to refund tx out"
-                                    await this.callWebHookFailed(task, relay, dealInfo)
-                                } else {
-                                    task.output = "cannot get transfer in confirm event from lp at task timeout -- something wrong"
-                                    await this.callWebHookFailed(task, relay, dealInfo)
-                                }
-                            }
-
-                            if (dealInfo.business && dealInfo.type?.startsWith('cheat') && dealInfo.complaint == true) {
-                                await this.taskExchangeComplaint(task, dealInfo)
-                            }
-                        }
-
-                        this.taskList = undefined
-                        throw new Error("tasks finished")
-                    },
-                },
-                {
-                    title: 'tick',
-                    enabled: true,
-                    task: (_: any, task: any): Listr => task.newListr([
-                        {
-                            title: 'random bridge',
-                            enabled: true,
-                            task: async (_: any, task: any): Promise<void> => {
-
-                                let finished = false
-                                this.taskRandomBridge(task, relay, dealInfo)
-                                    .then(() => finished = true)
-                                while (finished == false) {
-                                    await delay(100)
-                                }
-
-                            }
-                        },
-                        {
-                            title: 'random deal',
-                            enabled: true,
-                            task: async (_: any, task: any): Promise<void> => {
-
-                                let finished = false
-                                this.taskRandomDeal(task, dealInfo)
-                                    .then(() => finished = true)
-                                while (finished == false) {
-                                    await delay(100)
-                                }
-
-                            }
-                        },
-                        {
-                            title: 'submit deal',
-                            enabled: true,
-                            task: async (_: any, task: any): Promise<void> => {
-
-                                let finished = false
-                                this.taskSubmitDeal(task, relay, dealInfo)
-                                    .then(() => finished = true)
-                                    .catch(async (err) => {
-                                        task.output = err
-                                        if (err.message.includes("Insufficient balance: The destination token balance is less than the required amount")) {
-                                            await this.callWebHookSucceed(task, relay, dealInfo, err.message)
-                                        } else {
-                                            throw err
-                                        }
-                                    })
-                                while (finished == false) {
-                                    await delay(100)
-                                }
-
-                            }
-                        },
-                        {
-                            title: 'exchange',
-                            enabled: true,
-                            task: (_: any, task: any): Listr => task.newListr([
-                                {
-                                    title: 'tx out',
-                                    enable: true,
-                                    task: async (_: any, task: any): Promise<void> => {
-                                        dealInfo.step = Step.UserTransferOut
-                                        let finished = false
-                                        this.taskExchangeTxOut(task, relay, dealInfo)
-                                            .then(() => finished = true)
-                                        while (finished == false) {
-                                            await delay(100)
-                                        }
-
-                                    }
-                                },
-                                {
-                                    title: 'tx in',
-                                    enable: true,
-                                    task: async (_: any, task: any): Promise<void> => {
-                                        dealInfo.step = Step.LpTransferIn
-                                        let finished = false
-                                        this.taskExchangeTxIn(task, relay, dealInfo)
-                                            .then(() => finished = true)
-                                        while (finished == false) {
-                                            await delay(100)
-                                        }
-
-                                    }
-                                },
-                                {
-                                    title: 'tx out confirm',
-                                    enable: true,
-                                    task: async (_: any, task: any): Promise<void> => {
-                                        dealInfo.step = Step.UserConfirmOut
-                                        if (dealInfo.type == 'succeed') {
-
-                                            let finished = false
-                                            this.taskExchangeTxOutCfm(task, relay, dealInfo)
-                                                .then(() => finished = true)
-                                                .catch(async (err) => {
-                                                    console.error(err)
-                                                })
-
-                                            while (finished == false) {
-                                                await delay(100)
-                                            }
-                                        } else {
-
-                                            if (dealInfo.type == 'cheat txin') {
-
-                                                let finished = false
-                                                this.cheatExchangeTxInCfm(task, relay, dealInfo)
-                                                    .then(() => finished = true)
-                                                    .catch(async (err) => {
-                                                        console.error(err)
-                                                    })
-
-                                                while (finished == false) {
-                                                    await delay(100)
-                                                }
-                                            } else {
-                                                task.title = `${task.title} -- type ${dealInfo.type} skip this task`
-                                            }
-
-                                        }
-                                    }
-                                },
-                                {
-                                    title: 'tx in confirm',
-                                    enable: true,
-                                    task: async (_: any, task: any): Promise<void> => {
-                                        dealInfo.step = Step.LpConfirmIn
-                                        if (dealInfo.type == 'succeed') {
-
-
-                                            let finished = false
-                                            this.taskExchangeTxInCfm(task, relay, dealInfo)
-                                                .then(() => finished = true)
-
-                                            while (finished == false) {
-                                                await delay(100)
-                                            }
-                                        } else if (dealInfo.type == 'cheat txin') {
-
-
-                                            let finished = false
-                                            this.taskExchangeRelayTxOutCfm(task, relay, dealInfo)
-                                                .then(() => finished = true)
-
-                                            while (finished == false) {
-                                                await delay(100)
-                                            }
-                                        } else {
-                                            task.title = `${task.title} -- type ${dealInfo.type} skip this task`
-                                        }
-
-
-                                    }
-                                },
-                                {
-                                    title: 'tx out refund',
-                                    enable: true,
-                                    task: async (_: any, task: any): Promise<void> => {
-                                        dealInfo.step = Step.UserRefundOut
-                                        if (dealInfo.type == 'refund' || dealInfo.type == 'cheat address' || dealInfo.type == 'cheat amount') {
-
-                                            let finished = false
-                                            this.taskExchangeTxOutRefund(task, dealInfo)
-                                                .then(() => finished = true)
-
-                                            while (finished == false) {
-                                                await delay(100)
-                                            }
-                                        } else {
-                                            task.title = `${task.title} -- type ${dealInfo.type} skip this task`
-                                        }
-                                    }
-                                },
-                                {
-                                    title: 'tx in refund',
-                                    enable: true,
-                                    task: async (_: any, task: any): Promise<void> => {
-                                        dealInfo.step = Step.LpRefundIn
-                                        if (dealInfo.type == 'refund') {
-
-
-                                            let finished = false
-                                            this.taskExchangeTxInRefund(task, relay, dealInfo)
-                                                .then(() => finished = true)
-
-                                            while (finished == false) {
-                                                await delay(100)
-                                            }
-                                        } else {
-                                            task.title = `${task.title} -- type ${dealInfo.type} skip this task`
-                                        }
-
-                                    }
-                                },
-                                {
-                                    title: 'complaint',
-                                    enable: true,
-                                    task: async (_: any, task: any): Promise<void> => {
-                                        dealInfo.step = Step.Complaint
-
-                                        if (dealInfo.type?.startsWith('cheat')) {
-
-                                            if (dealInfo.complaint == true) {
-                                                await this.taskExchangeComplaint(task, dealInfo)
-                                            }
-                                        }
-
-                                        if (dealInfo.type == 'cheat address' || dealInfo.type == 'cheat amount') {
-                                            task.output = 'lp should not send tx in for the case'
-                                            await this.callWebHookFailed(task, relay, dealInfo)
-                                        } else {
-                                            await this.callWebHookSucceed(task, relay, dealInfo)
-                                        }
-
-                                        this.taskList = undefined
-                                    }
-                                }
-                            ], orderedTaskOption)
-                        },
-                    ], orderedTaskOption)
+                while (startTime + interval * 1000 > Date.now()) {
+                  await delay(1000)
                 }
-            ], concurrentTaskOption)
-            this.taskList.run()
-        } catch (error) {
-            console.error(error)
-        }
-    })
 
-    callWebHookSucceed = (task: any, relay: Relay, dealInfo: DealInfo, note?: string) => new Promise<void>(async (resolve, reject) => {
-        if (this.config.webhook != undefined) {
-
-            let swapInfo = dealInfo.business?.swap_asset_information
-            let { ["append_information"]: appendInfo, ...rest1 } = swapInfo!;
-            let { ["quote"]: quote, ...rest2 } = rest1!;
-
-            await needle('post', this.config.webhook, {
-                state: 'succeed',
-                time: getFormattedDateTime(),
-                network: this.config.network,
-                relay: relay.relayUrl,
-                lp: dealInfo.quote!.lp_info.name,
-                bridge: dealInfo.business?.swap_asset_information.quote.quote_base.bridge.bridge_name,
-                sender: dealInfo.business?.swap_asset_information.sender,
-                amount: dealInfo.business?.swap_asset_information.amount,
-                type: `test flow: ${dealInfo.type}`,
-                businessHash: dealInfo.business?.hash,
-                swapDetail: objectToString(rest2),
-                socketId: dealInfo.socketId,
-                note: note || '',
-            })
-
-            resolve()
-        }
-    })
-
-    callWebHookFailed = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
-        if (this.config.webhook != undefined) {
-
-            if (!dealInfo.business) {
-                let bridgeInfo = dealInfo.bridge ? `${dealInfo.bridge.src_chain_id}-${dealInfo.bridge.src_token}--->${dealInfo.bridge.dst_chain_id}-${dealInfo.bridge.dst_token}` : ''
-                await needle('post', this.config.webhook, {
-                    state: 'failed',
-                    time: getFormattedDateTime(),
-                    network: this.config.network,
-                    relay: relay.relayUrl,
-                    lp: '',
-                    bridge: bridgeInfo,
-                    sender: dealInfo.sender,
-                    amount: dealInfo.amount,
-                    type: `test flow: ${dealInfo.type}`,
-                    businessHash: '',
-                    messageTitle: task.title,
-                    messageData: sanitizeForJSON(task.output),
-                    swapDetail: '',
-                    socketId: dealInfo.socketId
-                })
-
-                return resolve()
-            }
-
-            let swapInfo = dealInfo.business.swap_asset_information
-            let { ["append_information"]: appendInfo, ...rest1 } = swapInfo!;
-            let { ["quote"]: quote, ...rest2 } = rest1!;
-
-            await needle('post', this.config.webhook, {
-                state: 'failed',
-                time: getFormattedDateTime(),
-                network: this.config.network,
-                relay: relay.relayUrl,
-                lp: dealInfo.quote!.lp_info.name,
-                bridge: dealInfo.business.swap_asset_information.quote.quote_base.bridge.bridge_name,
-                sender: dealInfo.business.swap_asset_information.sender,
-                amount: dealInfo.business.swap_asset_information.amount,
-                type: `test flow: ${dealInfo.type}`,
-                businessHash: dealInfo.business.hash,
-                messageTitle: task.title,
-                messageData: sanitizeForJSON(task.output),
-                swapDetail: objectToString(rest2),
-                socketId: dealInfo.socketId
-            })
-
-            resolve()
-        }
-    })
-
-    taskRandomBridge = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
-
-        task.output = `fetch bridge from ${this.config.relayUrl}`
-        const bridgeList: Bridge[] = (await relay.getBridge()).filter(bridge => {
-            if (this.config.bridges.length == 0) {
-                return true
-            } else {
-                for (const b of this.config.bridges) {
-                    if (`${bridge.src_chain_id}-${bridge.src_token}--->${bridge.dst_chain_id}-${bridge.dst_token}` == b) {
-                        return true
-                    }
-                }
-                return false
-            }
-        })
-        // .filter(b => (b.src_chain_id != 501 && b.dst_chain_id != 501))
-
-        task.output = `bridge size: ${bridgeList.length}, check token balance`
-
-        const enoughList: Bridge[] = []
-
-        for (const b of bridgeList) {
-            if (await this.isBalanceEnough(b)) {
-                enoughList.push(b)
-            }
-        }
-
-        task.output = `enough balance bridge size: ${enoughList.length}`
-
-        if (enoughList.length == 0) {
-            throw new Error("monkey has no balance on bridges");
-        }
-
-        dealInfo.bridge = enoughList[getRandomNumberInRange(0, enoughList.length - 1)]
-
-        task.title = `${task.title} --- (${dealInfo.bridge.src_chain_id}-${dealInfo.bridge.src_token}--->${dealInfo.bridge.dst_chain_id}-${dealInfo.bridge.dst_token})`
-
-        await delay(50)
-        resolve()
-    })
-
-    taskRandomDeal = (task: any, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
-        task.output = 'randoming...'
-
-        if (dealInfo.bridge == undefined) {
-            throw new Error("bridge is undefined");
-        }
-
-        const balance = await this.getBalance(dealInfo.bridge)
-        if (dealInfo.bridge.src_token == ZeroAddress) {
-            this.config.amountMin = 800
-            this.config.amountMax = 800
-        }
-        dealInfo.amount = balance.times(getRandomNumberInRange(this.config.amountMin, this.config.amountMax)).div(1000).toFixed(6, Bignumber.ROUND_DOWN)
-
-        dealInfo.type = this.config.type[getRandomNumberInRange(0, this.config.type.length - 1)]
-        dealInfo.complaint = 'true' == this.config.complaint[getRandomNumberInRange(0, this.config.complaint.length - 1)]
-
-        task.title = `${task.title} --- (amount:${dealInfo.amount}) --- (type:${dealInfo.type})`
-
-        await delay(50)
-        resolve()
-    })
-
-    taskSubmitDeal = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
-        if (dealInfo.bridge == undefined) {
-            throw new Error("bridge is undefined");
-        }
-        if (dealInfo.amount == undefined) {
-            throw new Error("amount is undefined");
-
-        }
-
-        let askFinished = false
-        const askTime = Date.now()
-        task.output = 'ask...'
-
-        let gotQuote = false
-        relay.ask({
-            bridge: dealInfo.bridge,
-            amount: dealInfo.amount
-        }, {
-            OnQuote: (quote: Quote) => {
-                console.log('get new quote', quote)
-                console.log(`got quote already? ${gotQuote ? "yes, then skip it" : "no, then take the quote"}`)
-                if (!gotQuote) {
-                    if (this.config.lp == undefined || this.config.lp == '') {
-                        dealInfo.quote = quote
+                if (this.taskList != undefined) {
+                  if (dealInfo.step == Step.UserTransferOut) {
+                    if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
+                      await this.taskExchangeTxOutRefund(task, dealInfo)
+                      await this.callWebHookSucceed(task, relay, dealInfo)
                     } else {
-                        if (quote.lp_info.name == this.config.lp) {
-                            dealInfo.quote = quote
-                        }
+                      task.output = `transfer out is failed to on chain`
+                      await this.callWebHookFailed(task, relay, dealInfo)
                     }
-                    if (dealInfo.quote != undefined) {
-                        askFinished = true
-                        gotQuote = true
+                  }
+
+                  if (dealInfo.step == Step.LpTransferIn) {
+                    await this.taskExchangeTxOutRefund(task, dealInfo)
+                    task.output = 'cannot get lp tx in, going to refund tx out'
+                    await this.callWebHookFailed(task, relay, dealInfo)
+                  }
+
+                  if (dealInfo.step == Step.UserConfirmOut) {
+                    await this.taskExchangeTxOutRefund(task, dealInfo)
+                    task.output = 'confirm out is failed on chain, going to refund tx out'
+                    await this.callWebHookFailed(task, relay, dealInfo)
+                  }
+
+                  if (dealInfo.step == Step.LpConfirmIn) {
+                    if (dealInfo.type == 'cheat txin') {
+                      await this.taskExchangeTxOutRefund(task, dealInfo)
+                      task.output =
+                        'relay tx out confirm - cannot get transfer out confirm event from relay at task timeout -- going to refund tx out'
+                      await this.callWebHookFailed(task, relay, dealInfo)
+                    } else {
+                      task.output = 'cannot get transfer in confirm event from lp at task timeout -- something wrong'
+                      await this.callWebHookFailed(task, relay, dealInfo)
                     }
+                  }
+
+                  if (dealInfo.business && dealInfo.type?.startsWith('cheat') && dealInfo.complaint == true) {
+                    await this.taskExchangeComplaint(task, dealInfo)
+                  }
                 }
-            }
-        })
 
-        while (askFinished == false) {
-            if (Date.now() - askTime > 1000 * 30) {
-                throw new Error("get quote failed");
-            }
-            await delay(500)
-        }
+                this.taskList = undefined
+                throw new Error('tasks finished')
+              },
+            },
+            {
+              title: 'tick',
+              enabled: true,
+              task: (_: any, task: any): Listr =>
+                task.newListr(
+                  [
+                    {
+                      title: 'random bridge',
+                      enabled: true,
+                      task: async (_: any, task: any): Promise<void> => {
+                        let finished = false
+                        this.taskRandomBridge(task, relay, dealInfo).then(() => (finished = true))
+                        while (finished == false) {
+                          await delay(100)
+                        }
+                      },
+                    },
+                    {
+                      title: 'random deal',
+                      enabled: true,
+                      task: async (_: any, task: any): Promise<void> => {
+                        let finished = false
+                        this.taskRandomDeal(task, dealInfo).then(() => (finished = true))
+                        while (finished == false) {
+                          await delay(100)
+                        }
+                      },
+                    },
+                    {
+                      title: 'submit deal',
+                      enabled: true,
+                      task: async (_: any, task: any): Promise<void> => {
+                        let finished = false
+                        this.taskSubmitDeal(task, relay, dealInfo)
+                          .then(() => (finished = true))
+                          .catch(async (err) => {
+                            task.output = err
+                            if (
+                              err.message.includes(
+                                'Insufficient balance: The destination token balance is less than the required amount',
+                              )
+                            ) {
+                              await this.callWebHookSucceed(task, relay, dealInfo, err.message)
+                            } else {
+                              throw err
+                            }
+                          })
+                        while (finished == false) {
+                          await delay(100)
+                        }
+                      },
+                    },
+                    {
+                      title: 'exchange',
+                      enabled: true,
+                      task: (_: any, task: any): Listr =>
+                        task.newListr(
+                          [
+                            {
+                              title: 'tx out',
+                              enable: true,
+                              task: async (_: any, task: any): Promise<void> => {
+                                dealInfo.step = Step.UserTransferOut
+                                let finished = false
+                                this.taskExchangeTxOut(task, relay, dealInfo).then(() => (finished = true))
+                                while (finished == false) {
+                                  await delay(100)
+                                }
+                              },
+                            },
+                            {
+                              title: 'tx in',
+                              enable: true,
+                              task: async (_: any, task: any): Promise<void> => {
+                                dealInfo.step = Step.LpTransferIn
+                                let finished = false
+                                this.taskExchangeTxIn(task, relay, dealInfo).then(() => (finished = true))
+                                while (finished == false) {
+                                  await delay(100)
+                                }
+                              },
+                            },
+                            {
+                              title: 'tx out confirm',
+                              enable: true,
+                              task: async (_: any, task: any): Promise<void> => {
+                                dealInfo.step = Step.UserConfirmOut
+                                if (dealInfo.type == 'succeed') {
+                                  let finished = false
+                                  this.taskExchangeTxOutCfm(task, relay, dealInfo)
+                                    .then(() => (finished = true))
+                                    .catch(async (err) => {
+                                      console.error(err)
+                                    })
 
-        dealInfo.socketId = relay.quoteManager.getSocketId()
+                                  while (finished == false) {
+                                    await delay(100)
+                                  }
+                                } else {
+                                  if (dealInfo.type == 'cheat txin') {
+                                    let finished = false
+                                    this.cheatExchangeTxInCfm(task, relay, dealInfo)
+                                      .then(() => (finished = true))
+                                      .catch(async (err) => {
+                                        console.error(err)
+                                      })
 
-        task.output = 'signing...'
+                                    while (finished == false) {
+                                      await delay(100)
+                                    }
+                                  } else {
+                                    task.title = `${task.title} -- type ${dealInfo.type} skip this task`
+                                  }
+                                }
+                              },
+                            },
+                            {
+                              title: 'tx in confirm',
+                              enable: true,
+                              task: async (_: any, task: any): Promise<void> => {
+                                dealInfo.step = Step.LpConfirmIn
+                                if (dealInfo.type == 'succeed') {
+                                  let finished = false
+                                  this.taskExchangeTxInCfm(task, relay, dealInfo).then(() => (finished = true))
 
-        if (dealInfo.quote == undefined) {
-            throw new Error("quote is undefined");
-        }
+                                  while (finished == false) {
+                                    await delay(100)
+                                  }
+                                } else if (dealInfo.type == 'cheat txin') {
+                                  let finished = false
+                                  this.taskExchangeRelayTxOutCfm(task, relay, dealInfo).then(() => (finished = true))
 
-        try {
-            dealInfo.srcRpc = this.config.rpcs[utils.GetChainName(dealInfo.quote.quote_base.bridge.src_chain_id).toLowerCase()]
-            dealInfo.dstRpc = this.config.rpcs[utils.GetChainName(dealInfo.quote.quote_base.bridge.dst_chain_id).toLowerCase()]
+                                  while (finished == false) {
+                                    await delay(100)
+                                  }
+                                } else {
+                                  task.title = `${task.title} -- type ${dealInfo.type} skip this task`
+                                }
+                              },
+                            },
+                            {
+                              title: 'tx out refund',
+                              enable: true,
+                              task: async (_: any, task: any): Promise<void> => {
+                                dealInfo.step = Step.UserRefundOut
+                                if (
+                                  dealInfo.type == 'refund' ||
+                                  dealInfo.type == 'cheat address' ||
+                                  dealInfo.type == 'cheat amount'
+                                ) {
+                                  let finished = false
+                                  this.taskExchangeTxOutRefund(task, dealInfo).then(() => (finished = true))
 
-            task.output = 'submitting...'
+                                  while (finished == false) {
+                                    await delay(100)
+                                  }
+                                } else {
+                                  task.title = `${task.title} -- type ${dealInfo.type} skip this task`
+                                }
+                              },
+                            },
+                            {
+                              title: 'tx in refund',
+                              enable: true,
+                              task: async (_: any, task: any): Promise<void> => {
+                                dealInfo.step = Step.LpRefundIn
+                                if (dealInfo.type == 'refund') {
+                                  let finished = false
+                                  this.taskExchangeTxInRefund(task, relay, dealInfo).then(() => (finished = true))
 
-            let privateKey = ''
-            if (utils.GetChainType(dealInfo.quote.quote_base.bridge.src_chain_id) == 'evm') {
-                privateKey = this.config.privateKey
-                dealInfo.sender = this.config.sendingAddress
-            } else if (utils.GetChainType(dealInfo.quote.quote_base.bridge.src_chain_id) == 'solana') {
-                privateKey = this.config.solanaPrivateKey
-                dealInfo.sender = this.config.solanaSendingAddress
-            }
+                                  while (finished == false) {
+                                    await delay(100)
+                                  }
+                                } else {
+                                  task.title = `${task.title} -- type ${dealInfo.type} skip this task`
+                                }
+                              },
+                            },
+                            {
+                              title: 'complaint',
+                              enable: true,
+                              task: async (_: any, task: any): Promise<void> => {
+                                dealInfo.step = Step.Complaint
 
-            let receivingAddress = ''
-            if (utils.GetChainType(dealInfo.quote.quote_base.bridge.dst_chain_id) == 'evm') {
-                receivingAddress = this.config.receivingAddress
-            } else if (utils.GetChainType(dealInfo.quote.quote_base.bridge.dst_chain_id) == 'solana') {
-                receivingAddress = this.config.solanaReceivingAddress
-            }
+                                if (dealInfo.type?.startsWith('cheat')) {
+                                  if (dealInfo.complaint == true) {
+                                    await this.taskExchangeComplaint(task, dealInfo)
+                                  }
+                                }
 
-            dealInfo.signData =
-                await Business.signQuoteByPrivateKey(
-                    this.config.network, dealInfo.quote, privateKey, dealInfo.amount, 0,
-                    receivingAddress, undefined, undefined, undefined, dealInfo.srcRpc, dealInfo.dstRpc)
+                                if (dealInfo.type == 'cheat address' || dealInfo.type == 'cheat amount') {
+                                  task.output = 'lp should not send tx in for the case'
+                                  await this.callWebHookFailed(task, relay, dealInfo)
+                                } else {
+                                  await this.callWebHookSucceed(task, relay, dealInfo)
+                                }
 
-            dealInfo.business = await relay.swap(dealInfo.quote, dealInfo.signData.signData, dealInfo.signData.signed)
-
-            if (dealInfo.business == undefined) {
-                throw new Error('failed to get business as relay returned a undefined due to unknown reason');
-            }
-
-            if (dealInfo.business.locked == false) {
-                throw new Error(`lp lock failed: ${dealInfo.business.lock_message}`);
-            }
-            console.log(`dealInfo.business`, dealInfo.business)
-            console.log(`dealInfo.business.swap_asset_information.quote.quote_base`, dealInfo.business.swap_asset_information.quote.quote_base)
-
-            task.title = `${task.title} -- (bidid:${dealInfo.business.hash})`
-
-            await delay(50)
-            resolve()
-        } catch (err) {
-            reject(err)
-        }
+                                this.taskList = undefined
+                              },
+                            },
+                          ],
+                          orderedTaskOption,
+                        ),
+                    },
+                  ],
+                  orderedTaskOption,
+                ),
+            },
+          ],
+          concurrentTaskOption,
+        )
+        this.taskList.run()
+      } catch (error) {
+        console.error(error)
+      }
     })
 
-    taskExchangeTxOut = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
-        task.output = 'sending...'
+  callWebHookSucceed = (task: any, relay: Relay, dealInfo: DealInfo, note?: string) =>
+    new Promise<void>(async (resolve, reject) => {
+      if (this.config.webhook != undefined) {
+        let swapInfo = dealInfo.business?.swap_asset_information
+        let {['append_information']: appendInfo, ...rest1} = swapInfo!
+        let {['quote']: quote, ...rest2} = rest1!
+
+        await needle('post', this.config.webhook, {
+          state: 'succeed',
+          time: getFormattedDateTime(),
+          network: this.config.network,
+          relay: relay.relayUrl,
+          lp: dealInfo.quote!.lp_info.name,
+          bridge: dealInfo.business?.swap_asset_information.quote.quote_base.bridge.bridge_name,
+          sender: dealInfo.business?.swap_asset_information.sender,
+          amount: dealInfo.business?.swap_asset_information.amount,
+          type: `test flow: ${dealInfo.type}`,
+          businessHash: dealInfo.business?.hash,
+          swapDetail: objectToString(rest2),
+          socketId: dealInfo.socketId,
+          note: note || '',
+        })
+
+        resolve()
+      }
+    })
+
+  callWebHookFailed = (task: any, relay: Relay, dealInfo: DealInfo) =>
+    new Promise<void>(async (resolve, reject) => {
+      if (this.config.webhook != undefined) {
+        if (!dealInfo.business) {
+          let bridgeInfo = dealInfo.bridge
+            ? `${dealInfo.bridge.src_chain_id}-${dealInfo.bridge.src_token}--->${dealInfo.bridge.dst_chain_id}-${dealInfo.bridge.dst_token}`
+            : ''
+          await needle('post', this.config.webhook, {
+            state: 'failed',
+            time: getFormattedDateTime(),
+            network: this.config.network,
+            relay: relay.relayUrl,
+            lp: '',
+            bridge: bridgeInfo,
+            sender: dealInfo.sender,
+            amount: dealInfo.amount,
+            type: `test flow: ${dealInfo.type}`,
+            businessHash: '',
+            messageTitle: task.title,
+            messageData: sanitizeForJSON(task.output),
+            swapDetail: '',
+            socketId: dealInfo.socketId,
+          })
+
+          return resolve()
+        }
+
+        let swapInfo = dealInfo.business.swap_asset_information
+        let {['append_information']: appendInfo, ...rest1} = swapInfo!
+        let {['quote']: quote, ...rest2} = rest1!
+
+        await needle('post', this.config.webhook, {
+          state: 'failed',
+          time: getFormattedDateTime(),
+          network: this.config.network,
+          relay: relay.relayUrl,
+          lp: dealInfo.quote!.lp_info.name,
+          bridge: dealInfo.business.swap_asset_information.quote.quote_base.bridge.bridge_name,
+          sender: dealInfo.business.swap_asset_information.sender,
+          amount: dealInfo.business.swap_asset_information.amount,
+          type: `test flow: ${dealInfo.type}`,
+          businessHash: dealInfo.business.hash,
+          messageTitle: task.title,
+          messageData: sanitizeForJSON(task.output),
+          swapDetail: objectToString(rest2),
+          socketId: dealInfo.socketId,
+        })
+
+        resolve()
+      }
+    })
+
+  taskRandomBridge = (task: any, relay: Relay, dealInfo: DealInfo) =>
+    new Promise<void>(async (resolve, reject) => {
+      task.output = `fetch bridge from ${this.config.relayUrl}`
+      const bridgeList: Bridge[] = (await relay.getBridge()).filter((bridge) => {
+        if (this.config.bridges.length == 0) {
+          return true
+        } else {
+          for (const b of this.config.bridges) {
+            if (`${bridge.src_chain_id}-${bridge.src_token}--->${bridge.dst_chain_id}-${bridge.dst_token}` == b) {
+              return true
+            }
+          }
+          return false
+        }
+      })
+      // .filter(b => (b.src_chain_id != 501 && b.dst_chain_id != 501))
+
+      task.output = `bridge size: ${bridgeList.length}, check token balance`
+
+      const enoughList: Bridge[] = []
+
+      for (const b of bridgeList) {
+        if (await this.isBalanceEnough(b)) {
+          enoughList.push(b)
+        }
+      }
+
+      task.output = `enough balance bridge size: ${enoughList.length}`
+
+      if (enoughList.length == 0) {
+        throw new Error('monkey has no balance on bridges')
+      }
+
+      dealInfo.bridge = enoughList[getRandomNumberInRange(0, enoughList.length - 1)]
+
+      task.title = `${task.title} --- (${dealInfo.bridge.src_chain_id}-${dealInfo.bridge.src_token}--->${dealInfo.bridge.dst_chain_id}-${dealInfo.bridge.dst_token})`
+
+      await delay(50)
+      resolve()
+    })
+
+  taskRandomDeal = (task: any, dealInfo: DealInfo) =>
+    new Promise<void>(async (resolve, reject) => {
+      task.output = 'randoming...'
+
+      if (dealInfo.bridge == undefined) {
+        throw new Error('bridge is undefined')
+      }
+
+      const balance = await this.getBalance(dealInfo.bridge)
+      if (dealInfo.bridge.src_token == ZeroAddress) {
+        this.config.amountMin = 800
+        this.config.amountMax = 800
+      }
+      dealInfo.amount = balance
+        .times(getRandomNumberInRange(this.config.amountMin, this.config.amountMax))
+        .div(1000)
+        .toFixed(6, Bignumber.ROUND_DOWN)
+
+      dealInfo.type = this.config.type[getRandomNumberInRange(0, this.config.type.length - 1)]
+      dealInfo.complaint = 'true' == this.config.complaint[getRandomNumberInRange(0, this.config.complaint.length - 1)]
+
+      task.title = `${task.title} --- (amount:${dealInfo.amount}) --- (type:${dealInfo.type})`
+
+      await delay(50)
+      resolve()
+    })
+
+  taskSubmitDeal = (task: any, relay: Relay, dealInfo: DealInfo) =>
+    new Promise<void>(async (resolve, reject) => {
+      if (dealInfo.bridge == undefined) {
+        throw new Error('bridge is undefined')
+      }
+      if (dealInfo.amount == undefined) {
+        throw new Error('amount is undefined')
+      }
+
+      let askFinished = false
+      const askTime = Date.now()
+      task.output = 'ask...'
+
+      let gotQuote = false
+      relay.ask(
+        {
+          bridge: dealInfo.bridge,
+          amount: dealInfo.amount,
+        },
+        {
+          OnQuote: (quote: Quote) => {
+            console.log('get new quote', quote)
+            console.log(`got quote already? ${gotQuote ? 'yes, then skip it' : 'no, then take the quote'}`)
+            if (!gotQuote) {
+              if (this.config.lp == undefined || this.config.lp == '') {
+                dealInfo.quote = quote
+              } else {
+                if (quote.lp_info.name == this.config.lp) {
+                  dealInfo.quote = quote
+                }
+              }
+              if (dealInfo.quote != undefined) {
+                askFinished = true
+                gotQuote = true
+              }
+            }
+          },
+        },
+      )
+
+      while (askFinished == false) {
+        if (Date.now() - askTime > 1000 * 30) {
+          throw new Error('get quote failed')
+        }
+        await delay(500)
+      }
+
+      dealInfo.socketId = relay.quoteManager.getSocketId()
+
+      task.output = 'signing...'
+
+      if (dealInfo.quote == undefined) {
+        throw new Error('quote is undefined')
+      }
+
+      try {
+        dealInfo.srcRpc =
+          this.config.rpcs[utils.GetChainName(dealInfo.quote.quote_base.bridge.src_chain_id).toLowerCase()]
+        dealInfo.dstRpc =
+          this.config.rpcs[utils.GetChainName(dealInfo.quote.quote_base.bridge.dst_chain_id).toLowerCase()]
+
+        task.output = 'submitting...'
+
+        let privateKey = ''
+        if (utils.GetChainType(dealInfo.quote.quote_base.bridge.src_chain_id) == 'evm') {
+          privateKey = this.config.privateKey
+          dealInfo.sender = this.config.sendingAddress
+        } else if (utils.GetChainType(dealInfo.quote.quote_base.bridge.src_chain_id) == 'solana') {
+          privateKey = this.config.solanaPrivateKey
+          dealInfo.sender = this.config.solanaSendingAddress
+        }
+
+        let receivingAddress = ''
+        if (utils.GetChainType(dealInfo.quote.quote_base.bridge.dst_chain_id) == 'evm') {
+          receivingAddress = this.config.receivingAddress
+        } else if (utils.GetChainType(dealInfo.quote.quote_base.bridge.dst_chain_id) == 'solana') {
+          receivingAddress = this.config.solanaReceivingAddress
+        }
+
+        dealInfo.signData = (await Business.signQuote(
+          this.config.network!,
+          dealInfo.quote,
+          dealInfo.amount,
+          0,
+          receivingAddress,
+          undefined,
+          undefined,
+          undefined,
+          dealInfo.srcRpc,
+          dealInfo.dstRpc,
+          {
+            type: 'privateKey',
+            privateKey: privateKey,
+          },
+        )) as SwapSignedData
+
+        dealInfo.business = await relay.swap(dealInfo.quote, dealInfo.signData.signData, dealInfo.signData.signed)
 
         if (dealInfo.business == undefined) {
-            throw new Error("business is undefined");
+          throw new Error('failed to get business as relay returned a undefined due to unknown reason')
         }
 
-        if (dealInfo.type == 'cheat amount') {
-            const dArr = dealInfo.business.swap_asset_information.amount.split('.')
-            const d = dArr.length == 2 ? [dArr].length : 0
-            dealInfo.business.swap_asset_information.amount = new Bignumber(dealInfo.business.swap_asset_information.amount).times(0.8).toFixed(d)
+        if (dealInfo.business.locked == false) {
+          throw new Error(`lp lock failed: ${dealInfo.business.lock_message}`)
         }
+        console.log(`dealInfo.business`, dealInfo.business)
+        console.log(
+          `dealInfo.business.swap_asset_information.quote.quote_base`,
+          dealInfo.business.swap_asset_information.quote.quote_base,
+        )
 
-        if (dealInfo.type == 'cheat address') {
-            dealInfo.business.swap_asset_information.quote.quote_base.lp_bridge_address = dealInfo.business.swap_asset_information.sender
+        task.title = `${task.title} -- (bidid:${dealInfo.business.hash})`
+
+        await delay(50)
+        resolve()
+      } catch (err) {
+        reject(err)
+      }
+    })
+
+  taskExchangeTxOut = (task: any, relay: Relay, dealInfo: DealInfo) =>
+    new Promise<void>(async (resolve, reject) => {
+      task.output = 'sending...'
+
+      if (dealInfo.business == undefined) {
+        throw new Error('business is undefined')
+      }
+
+      if (dealInfo.type == 'cheat amount') {
+        const dArr = dealInfo.business.swap_asset_information.amount.split('.')
+        const d = dArr.length == 2 ? [dArr].length : 0
+        dealInfo.business.swap_asset_information.amount = new Bignumber(dealInfo.business.swap_asset_information.amount)
+          .times(0.8)
+          .toFixed(d)
+      }
+
+      if (dealInfo.type == 'cheat address') {
+        dealInfo.business.swap_asset_information.quote.quote_base.lp_bridge_address =
+          dealInfo.business.swap_asset_information.sender
+      }
+
+      await retry(
+        async () => {
+          if (
+            utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm'
+          ) {
+            const resp = await Business.transferOut(dealInfo.business!, this.config.network!, dealInfo.srcRpc, {
+              type: 'privateKey',
+              privateKey: this.config.privateKey,
+              useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
+            })
+            task.output = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
+            task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
+          } else if (
+            utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) ==
+            'solana'
+          ) {
+            const resp = await Business.transferOut(dealInfo.business!, this.config.network!, dealInfo.srcRpc, {
+              type: 'privateKey',
+              privateKey: this.config.privateKey,
+              useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
+            })
+            task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+            task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+          }
+        },
+        {
+          retries: 5,
+          onRetry: (error, attempt) => {
+            console.log(`retry ${attempt} -- get error -- ${error}`)
+          },
+        },
+      )
+
+      let succeed = false
+
+      while (succeed == false) {
+        await delay(2000)
+        const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
+        task.output = `waiting... step: ${resp.step}`
+        succeed = resp.step == Step.UserTransferOut
+
+        if (succeed) {
+          task.output = `transfer out is on chain successfully`
         }
+      }
+      resolve()
+    })
 
-        await retry(async () => {
-            if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
-                const resp = await Business.transferOutByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.srcRpc, this.config.useMaximumGasPriceAtMost)
-                task.output = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
-                task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
-            } else if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-                const resp = await Business.transferOutByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, this.config.useMaximumGasPriceAtMost)
-                task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
-                task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+  taskExchangeTxIn = (task: any, relay: Relay, dealInfo: DealInfo) =>
+    new Promise<void>(async (resolve, reject) => {
+      task.output = 'waiting...'
+
+      if (dealInfo.business == undefined) {
+        throw new Error('business is undefined')
+      }
+
+      let succeed = false
+
+      while (succeed == false) {
+        await delay(2000)
+        const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
+        task.output = `waiting... step: ${resp.step}`
+        succeed = resp.step >= Step.LpTransferIn
+
+        if (succeed) {
+          //get business data and show txhash
+          const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
+          if (businessFull.event_transfer_in && businessFull.event_transfer_in.transfer_info) {
+            if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
+              task.title = `${task.title} -- lp should not send tx in for the case - ${JSON.parse(businessFull.event_transfer_in.transfer_info).transactionHash}`
+            } else {
+              task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in.transfer_info).transactionHash}`
             }
-        }, {
+          } else {
+            throw new Error('getBusinessFull failed to return data with event_transfer_in info')
+          }
+        }
+      }
+
+      resolve()
+    })
+
+  taskExchangeTxOutCfm = (task: any, relay: Relay, dealInfo: DealInfo) =>
+    new Promise<void>(async (resolve, reject) => {
+      task.output = 'sending...'
+
+      if (dealInfo.business == undefined) {
+        throw new Error('business is undefined')
+      }
+
+      try {
+        await retry(
+          async () => {
+            if (
+              utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) ==
+              'evm'
+            ) {
+              const resp = await Business.transferOutConfirm(
+                dealInfo.business!,
+                this.config.network!,
+                dealInfo.srcRpc,
+                {
+                  type: 'privateKey',
+                  privateKey: this.config.privateKey,
+                  useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
+                },
+              )
+              task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
+            } else if (
+              utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) ==
+              'solana'
+            ) {
+              const resp = await Business.transferOutConfirm(
+                dealInfo.business!,
+                this.config.network!,
+                dealInfo.srcRpc,
+                {
+                  type: 'privateKey',
+                  privateKey: this.config.solanaPrivateKey,
+                  useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
+                },
+              )
+              task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+            }
+          },
+          {
             retries: 5,
             onRetry: (error, attempt) => {
-                console.log(`retry ${attempt} -- get error -- ${error}`);
+              console.log(`retry ${attempt} -- get error -- ${error}`)
             },
-        })
-
-
-        let succeed = false
-
-        while (succeed == false) {
-            await delay(2000)
-            const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
-            task.output = `waiting... step: ${resp.step}`
-            succeed = resp.step == Step.UserTransferOut
-
-            if (succeed) {
-                task.output = `transfer out is on chain successfully`
-            }
-        }
-        resolve()
-    })
-
-    taskExchangeTxIn = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
-        task.output = 'waiting...'
-
-        if (dealInfo.business == undefined) {
-            throw new Error("business is undefined");
-        }
+          },
+        )
 
         let succeed = false
 
         while (succeed == false) {
-            await delay(2000)
-            const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
-            task.output = `waiting... step: ${resp.step}`
-            succeed = resp.step >= Step.LpTransferIn
+          await delay(2000)
+          const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
+          task.output = `waiting... step: ${resp.step}`
+          succeed = resp.step == Step.UserConfirmOut
 
-            if (succeed) {
-
-                //get business data and show txhash
-                const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
-                if (businessFull.event_transfer_in && businessFull.event_transfer_in.transfer_info) {
-                    if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
-                        task.title = `${task.title} -- lp should not send tx in for the case - ${JSON.parse(businessFull.event_transfer_in.transfer_info).transactionHash}`
-                    } else {
-                        task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in.transfer_info).transactionHash}`
-                    }
-                } else {
-                    throw new Error("getBusinessFull failed to return data with event_transfer_in info")
-                }
-            }
+          if (succeed) {
+            task.output = `confirm out is on chain successfully`
+          }
         }
 
+        await delay(50)
         resolve()
+      } catch (err) {
+        reject(err)
+      }
     })
 
-    taskExchangeTxOutCfm = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
-        task.output = 'sending...'
+  cheatExchangeTxInCfm = (task: any, relay: Relay, dealInfo: DealInfo) =>
+    new Promise<void>(async (resolve, reject) => {
+      task.output = 'user cheat confirm in sending...'
 
-        if (dealInfo.business == undefined) {
-            throw new Error("business is undefined");
-        }
+      if (dealInfo.business == undefined) {
+        throw new Error('business is undefined')
+      }
 
-        try {
-            await retry(async () => {
-                if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
-                    const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.srcRpc, this.config.useMaximumGasPriceAtMost)
-                    task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
-                } else if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-                    const resp = await Business.transferOutConfirmByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, this.config.useMaximumGasPriceAtMost)
-                    task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
-                }
-            }, {
-                retries: 5,
-                onRetry: (error, attempt) => {
-                    console.log(`retry ${attempt} -- get error -- ${error}`);
-                },
-            })
+      try {
+        let agreementReachedTime = dealInfo.business.swap_asset_information.agreement_reached_time * 1000
+        let expectedSingleStepTime = dealInfo.business.swap_asset_information.expected_single_step_time * 1000
+        let tolerantSingleStepTime = dealInfo.business.swap_asset_information.tolerant_single_step_time * 1000
 
-            let succeed = false
-
-            while (succeed == false) {
-                await delay(2000)
-                const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
-                task.output = `waiting... step: ${resp.step}`
-                succeed = resp.step == Step.UserConfirmOut
-
-                if (succeed) {
-                    task.output = `confirm out is on chain successfully`
-                }
-            }
-
-            await delay(50)
-            resolve()
-        } catch (err) {
-            reject(err)
-        }
-
-    })
-
-    cheatExchangeTxInCfm = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
-        task.output = 'user cheat confirm in sending...'
-
-        if (dealInfo.business == undefined) {
-            throw new Error("business is undefined");
-        }
-
-        try {
-            let agreementReachedTime = dealInfo.business.swap_asset_information.agreement_reached_time * 1000
-            let expectedSingleStepTime = dealInfo.business.swap_asset_information.expected_single_step_time * 1000
-            let tolerantSingleStepTime = dealInfo.business.swap_asset_information.tolerant_single_step_time * 1000
-
-            let timelock = agreementReachedTime + 3 * expectedSingleStepTime + 1 * tolerantSingleStepTime
-            let canDo = false
-            while (canDo == false) {
-                await delay(2000)
-
-                canDo = Date.now() > (timelock + 10 * 1000)
-
-                task.output = `can cheat transfer in confirm: ${canDo}, now: ${Date.now()}, time lock: ${timelock + 10 * 1000}`
-            }
-
-            const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
-            let sender: string | undefined
-            if (businessFull.event_transfer_in && businessFull.event_transfer_in.sender) {
-                sender = businessFull.event_transfer_in.sender
-            }
-            if (sender === undefined) {
-                throw new Error("failed to get sender address")
-            }
-
-            await retry(async () => {
-                if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'evm') {
-
-                    const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.dstRpc, sender, this.config.useMaximumGasPriceAtMost)
-                    task.title = `${task.title} -- user cheat confirm in -- ${(resp as ethers.ContractTransactionResponse).hash}`
-                } else if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.dst_chain_id) == 'solana') {
-
-                    const resp = await Business.transferInConfirmByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.dstRpc, sender, this.config.useMaximumGasPriceAtMost)
-                    task.title = `${task.title} -- user cheat confirm in -- ${(resp as ResponseSolana).txHash}`
-                }
-            }, {
-                retries: 5,
-                onRetry: (error, attempt) => {
-                    console.log(`retry ${attempt} -- get error -- ${error}`);
-                },
-            })
-
-            let succeed = false
-            while (succeed == false) {
-                await delay(2000)
-                const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
-                task.output = `waiting... cheat transfer in confirm: ${resp.transfer_in_confirm_id}`
-                succeed = resp.transfer_in_confirm_id > 0
-
-                if (succeed) {
-                    task.output = `cheat transfer in confirm is on chain successfully`
-                }
-            }
-
-            await delay(50)
-            resolve()
-        } catch (err) {
-            reject(err)
-        }
-    })
-
-    taskExchangeTxInCfm = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
-        task.output = 'waiting...'
-
-        let succeed = false
-
-        if (dealInfo.business == undefined) {
-            throw new Error("business is undefined");
-        }
-
-        while (succeed == false) {
-
-            await delay(2000)
-            const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
-            task.output = `waiting... step: ${resp.step}`
-            succeed = resp.step >= Step.LpConfirmIn
-
-            if (succeed) {
-                //get business data and show txhash
-                const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
-                if (businessFull.event_transfer_in_confirm && businessFull.event_transfer_in_confirm.transfer_info) {
-                    task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_confirm.transfer_info).transactionHash}`
-                }
-            }
-        }
-        resolve()
-    })
-
-    taskExchangeRelayTxOutCfm = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
-        task.output = 'relay tx out confirm waiting...'
-
-        let succeed = false
-
-        if (dealInfo.business == undefined) {
-            throw new Error("business is undefined");
-        }
-
-        while (succeed == false) {
-
-            await delay(2000)
-
-            const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
-            task.output = `waiting... relay tx out confirm: ${resp.transfer_out_confirm_id}`
-            succeed = resp.transfer_out_confirm_id > 0
-
-            if (succeed) {
-                //get business data and show txhash
-                const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
-                if (businessFull.event_transfer_out_confirm && businessFull.event_transfer_out_confirm.transfer_info) {
-                    task.title = `${task.title} - relay tx out confirm -- ${JSON.parse(businessFull.event_transfer_out_confirm.transfer_info).transactionHash}`
-                }
-            }
-        }
-        resolve()
-    })
-
-
-
-    taskExchangeTxOutRefund = (task: any, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
-        task.output = 'checking...'
-
-        if (dealInfo.business == undefined) {
-            throw new Error("business is undefined");
-        }
-
+        let timelock = agreementReachedTime + 3 * expectedSingleStepTime + 1 * tolerantSingleStepTime
         let canDo = false
         while (canDo == false) {
-            await delay(2000)
+          await delay(2000)
 
-            canDo = Date.now() > (dealInfo.business.swap_asset_information.earliest_refund_time * 1000 + 10 * 1000)
+          canDo = Date.now() > timelock + 10 * 1000
 
-            task.output = `can refund: ${canDo}, now: ${Date.now()}, time lock: ${dealInfo.business.swap_asset_information.earliest_refund_time * 1000 + 10 * 1000}`
+          task.output = `can cheat transfer in confirm: ${canDo}, now: ${Date.now()}, time lock: ${timelock + 10 * 1000}`
         }
 
-        await retry(async () => {
-            if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
-                const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business!, this.config.privateKey, this.config.network, dealInfo.srcRpc, this.config.useMaximumGasPriceAtMost)
-                task.output = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
-                task.title = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
-            } else if (utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana') {
-                const resp = await Business.transferOutRefundByPrivateKey(dealInfo.business!, this.config.solanaPrivateKey, this.config.network, dealInfo.srcRpc, this.config.useMaximumGasPriceAtMost)
-                task.output = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
-                task.title = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
+        const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
+        let sender: string | undefined
+        if (businessFull.event_transfer_in && businessFull.event_transfer_in.sender) {
+          sender = businessFull.event_transfer_in.sender
+        }
+        if (sender === undefined) {
+          throw new Error('failed to get sender address')
+        }
+
+        await retry(
+          async () => {
+            if (
+              utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.dst_chain_id) ==
+              'evm'
+            ) {
+              const resp = await Business.transferInConfirm(
+                dealInfo.business!,
+                this.config.network!,
+                dealInfo.dstRpc,
+                sender,
+                {
+                  type: 'privateKey',
+                  privateKey: this.config.privateKey,
+                  useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
+                },
+              )
+              task.title = `${task.title} -- user cheat confirm in -- ${(resp as ethers.ContractTransactionResponse).hash}`
+            } else if (
+              utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.dst_chain_id) ==
+              'solana'
+            ) {
+              const resp = await Business.transferInConfirm(
+                dealInfo.business!,
+                this.config.network!,
+                dealInfo.dstRpc,
+                sender,
+                {
+                  type: 'privateKey',
+                  privateKey: this.config.solanaPrivateKey,
+                  useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
+                },
+              )
+              task.title = `${task.title} -- user cheat confirm in -- ${(resp as ResponseSolana).txHash}`
             }
-        }, {
+          },
+          {
             retries: 5,
             onRetry: (error, attempt) => {
-                console.log(`retry ${attempt} -- get error -- ${error}`);
+              console.log(`retry ${attempt} -- get error -- ${error}`)
             },
-        })
-
-        await delay(50)
-
-        resolve()
-    })
-
-    taskExchangeTxInRefund = (task: any, relay: Relay, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
-        task.output = 'waiting...'
+          },
+        )
 
         let succeed = false
-
-        if (dealInfo.business == undefined) {
-            throw new Error("business is undefined");
-        }
-
         while (succeed == false) {
+          await delay(2000)
+          const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
+          task.output = `waiting... cheat transfer in confirm: ${resp.transfer_in_confirm_id}`
+          succeed = resp.transfer_in_confirm_id > 0
 
-            await delay(2000)
-
-            const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
-            task.output = `waiting... step: ${resp.step}`
-            succeed = resp.step >= Step.LpRefundIn
-
-            if (succeed) {
-                //get business data and show txhash
-                const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
-                if (businessFull.event_transfer_in_refund && businessFull.event_transfer_in_refund.transfer_info) {
-                    task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_refund.transfer_info).transactionHash}`
-                }
-
-            }
-        }
-        resolve()
-    })
-
-    taskExchangeComplaint = (task: any, dealInfo: DealInfo) => new Promise<void>(async (resolve, reject) => {
-        task.output = 'complaiming...'
-
-        if (dealInfo.business == undefined) {
-            throw new Error("business is undefined");
-        }
-
-        const resp = await Business.complainByPrivateKey(dealInfo.business, this.config.privateKey, this.config.network)
-        if (resp === true) {
-            task.output = `${task.title} -- complaint -- submitted successfully`
-            task.title = `${task.title} -- complaint -- submitted successfully`
-        } else {
-            task.output = `${task.title} -- complaint -- failed to submit due to ${resp}`
-            task.title = `${task.title} -- complaint -- failed to submit due to ${resp}`
+          if (succeed) {
+            task.output = `cheat transfer in confirm is on chain successfully`
+          }
         }
 
         await delay(50)
-
         resolve()
+      } catch (err) {
+        reject(err)
+      }
     })
 
-    initNetwork = () => new Promise<void>(async (resolve, reject) => {
-        if (this.network == undefined || (this.network != 'mainnet' && this.network != 'testnet')) {
-            const netValue: { value: string } = await prompt({
-                type: 'select',
-                name: 'value',
-                message: 'Pick network',
-                choices: [
-                    { name: 'mainnet', value: 'mainnet' },
-                    { name: 'testnet', value: 'testnet' },
-                ]
-            });
-            this.network = netValue.value
+  taskExchangeTxInCfm = (task: any, relay: Relay, dealInfo: DealInfo) =>
+    new Promise<void>(async (resolve, reject) => {
+      task.output = 'waiting...'
+
+      let succeed = false
+
+      if (dealInfo.business == undefined) {
+        throw new Error('business is undefined')
+      }
+
+      while (succeed == false) {
+        await delay(2000)
+        const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
+        task.output = `waiting... step: ${resp.step}`
+        succeed = resp.step >= Step.LpConfirmIn
+
+        if (succeed) {
+          //get business data and show txhash
+          const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
+          if (businessFull.event_transfer_in_confirm && businessFull.event_transfer_in_confirm.transfer_info) {
+            task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_confirm.transfer_info).transactionHash}`
+          }
         }
-        this.config.network = this.network
-        console.log('network', this.config.network)
-
-        resolve()
+      }
+      resolve()
     })
 
-    initInterval = () => new Promise<void>(async (resolve, reject) => {
-        if (this.interval == undefined || this.interval.split('-').length != 2) {
-            const intervalValue: any = await prompt({
-                name: 'ConfigRPSC',
-                type: 'snippet',
-                message: 'enter the interval, unit in seconds: [min]-[max]',
-                required: true,
-                template: `#{min}-#{max}`
+  taskExchangeRelayTxOutCfm = (task: any, relay: Relay, dealInfo: DealInfo) =>
+    new Promise<void>(async (resolve, reject) => {
+      task.output = 'relay tx out confirm waiting...'
+
+      let succeed = false
+
+      if (dealInfo.business == undefined) {
+        throw new Error('business is undefined')
+      }
+
+      while (succeed == false) {
+        await delay(2000)
+
+        const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
+        task.output = `waiting... relay tx out confirm: ${resp.transfer_out_confirm_id}`
+        succeed = resp.transfer_out_confirm_id > 0
+
+        if (succeed) {
+          //get business data and show txhash
+          const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
+          if (businessFull.event_transfer_out_confirm && businessFull.event_transfer_out_confirm.transfer_info) {
+            task.title = `${task.title} - relay tx out confirm -- ${JSON.parse(businessFull.event_transfer_out_confirm.transfer_info).transactionHash}`
+          }
+        }
+      }
+      resolve()
+    })
+
+  taskExchangeTxOutRefund = (task: any, dealInfo: DealInfo) =>
+    new Promise<void>(async (resolve, reject) => {
+      task.output = 'checking...'
+
+      if (dealInfo.business == undefined) {
+        throw new Error('business is undefined')
+      }
+
+      let canDo = false
+      while (canDo == false) {
+        await delay(2000)
+
+        canDo = Date.now() > dealInfo.business.swap_asset_information.earliest_refund_time * 1000 + 10 * 1000
+
+        task.output = `can refund: ${canDo}, now: ${Date.now()}, time lock: ${dealInfo.business.swap_asset_information.earliest_refund_time * 1000 + 10 * 1000}`
+      }
+
+      await retry(
+        async () => {
+          if (
+            utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm'
+          ) {
+            const resp = await Business.transferOutRefund(dealInfo.business!, this.config.network!, dealInfo.srcRpc, {
+              type: 'privateKey',
+              privateKey: this.config.privateKey,
+              useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
             })
-            this.interval = intervalValue.ConfigRPSC.result as string
-        }
-        const intervalStr = this.interval.split('-')
-        this.config.intervalMin = parseInt(intervalStr[0])
-        this.config.intervalMax = parseInt(intervalStr[1])
+            task.output = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
+            task.title = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
+          } else if (
+            utils.GetChainType(dealInfo.business!.swap_asset_information.quote.quote_base.bridge.src_chain_id) ==
+            'solana'
+          ) {
+            const resp = await Business.transferOutRefund(dealInfo.business!, this.config.network!, dealInfo.srcRpc, {
+              type: 'privateKey',
+              privateKey: this.config.solanaPrivateKey,
+              useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
+            })
+            task.output = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
+            task.title = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
+          }
+        },
+        {
+          retries: 5,
+          onRetry: (error, attempt) => {
+            console.log(`retry ${attempt} -- get error -- ${error}`)
+          },
+        },
+      )
 
-        console.log(`interval min: ${this.config.intervalMin}`)
-        console.log(`interval max: ${this.config.intervalMax}`)
+      // wait for the transaction be minted
+      await delay(1000 * 3)
 
-        resolve()
+      resolve()
     })
 
-    initRelay = () => new Promise<void>(async (resolve, reject) => {
-        if (this.relay == undefined) {
-            const relayUrlValue: { value: string } = (await prompt({
-                type: 'input',
-                name: 'value',
-                message: 'Enter relay url',
-            }))
-            this.relay = relayUrlValue.value
-        }
-        this.config.relayUrl = this.relay
-        console.log('relay url:', this.config.relayUrl)
+  taskExchangeTxInRefund = (task: any, relay: Relay, dealInfo: DealInfo) =>
+    new Promise<void>(async (resolve, reject) => {
+      task.output = 'waiting...'
 
-        resolve()
+      let succeed = false
+
+      if (dealInfo.business == undefined) {
+        throw new Error('business is undefined')
+      }
+
+      while (succeed == false) {
+        await delay(2000)
+
+        const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
+        task.output = `waiting... step: ${resp.step}`
+        succeed = resp.step >= Step.LpRefundIn
+
+        if (succeed) {
+          //get business data and show txhash
+          const businessFull = await getBusinessFullRetry(relay, dealInfo.business.hash)
+          if (businessFull.event_transfer_in_refund && businessFull.event_transfer_in_refund.transfer_info) {
+            task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_refund.transfer_info).transactionHash}`
+          }
+        }
+      }
+      resolve()
     })
 
-    initChainRpc = async () => {
-        if (Object.keys(this.rpcs).length == 0) {
-            const configRpc: { value: boolean } = await prompt({
-                type: 'toggle',
-                name: 'value',
-                message: 'Do you want to customize the rpc address?',
-                enabled: 'Yes',
-                disabled: 'No'
-            });
-            console.log('configRpc', configRpc.value)
-            if (configRpc.value == true) {
-                const rpcsValue: any = await prompt({
-                    name: 'ConfigRPSC',
-                    type: 'snippet',
-                    message: 'enter your rpc url',
-                    required: true,
-                    template: `{
+  taskExchangeComplaint = (task: any, dealInfo: DealInfo) =>
+    new Promise<void>(async (resolve, reject) => {
+      task.output = 'complaiming...'
+
+      if (dealInfo.business == undefined) {
+        throw new Error('business is undefined')
+      }
+
+      const resp = await Business.complain(dealInfo.business, this.config.privateKey, this.config.network!)
+      if (resp === true) {
+        task.output = `${task.title} -- complaint -- submitted successfully`
+        task.title = `${task.title} -- complaint -- submitted successfully`
+      } else {
+        task.output = `${task.title} -- complaint -- failed to submit due to ${resp}`
+        task.title = `${task.title} -- complaint -- failed to submit due to ${resp}`
+      }
+
+      await delay(50)
+
+      resolve()
+    })
+
+  initNetwork = () =>
+    new Promise<void>(async (resolve, reject) => {
+      if (this.network == undefined || (this.network != 'mainnet' && this.network != 'testnet')) {
+        const netValue: {value: string} = await prompt({
+          type: 'select',
+          name: 'value',
+          message: 'Pick network',
+          choices: [
+            {name: 'mainnet', value: 'mainnet'},
+            {name: 'testnet', value: 'testnet'},
+          ],
+        })
+        this.network = netValue.value
+      }
+      this.config.network = NetworkType[this.network as keyof typeof NetworkType]
+      console.log('network', this.config.network)
+
+      resolve()
+    })
+
+  initInterval = () =>
+    new Promise<void>(async (resolve, reject) => {
+      if (this.interval == undefined || this.interval.split('-').length != 2) {
+        const intervalValue: any = await prompt({
+          name: 'ConfigRPSC',
+          type: 'snippet',
+          message: 'enter the interval, unit in seconds: [min]-[max]',
+          required: true,
+          template: `#{min}-#{max}`,
+        })
+        this.interval = intervalValue.ConfigRPSC.result as string
+      }
+      const intervalStr = this.interval.split('-')
+      this.config.intervalMin = parseInt(intervalStr[0])
+      this.config.intervalMax = parseInt(intervalStr[1])
+
+      console.log(`interval min: ${this.config.intervalMin}`)
+      console.log(`interval max: ${this.config.intervalMax}`)
+
+      resolve()
+    })
+
+  initRelay = () =>
+    new Promise<void>(async (resolve, reject) => {
+      if (this.relay == undefined) {
+        const relayUrlValue: {value: string} = await prompt({
+          type: 'input',
+          name: 'value',
+          message: 'Enter relay url',
+        })
+        this.relay = relayUrlValue.value
+      }
+      this.config.relayUrl = this.relay
+      console.log('relay url:', this.config.relayUrl)
+
+      resolve()
+    })
+
+  initChainRpc = async () => {
+    if (Object.keys(this.rpcs).length == 0) {
+      const configRpc: {value: boolean} = await prompt({
+        type: 'toggle',
+        name: 'value',
+        message: 'Do you want to customize the rpc address?',
+        enabled: 'Yes',
+        disabled: 'No',
+      })
+      console.log('configRpc', configRpc.value)
+      if (configRpc.value == true) {
+        const rpcsValue: any = await prompt({
+          name: 'ConfigRPSC',
+          type: 'snippet',
+          message: 'enter your rpc url',
+          required: true,
+          template: `{
                   bsc: #{bsc_rpc_url},
                   opt: #{opt_rpc_url},
                   solana: #{solana_rpc_url}
-                }`
-                })
+                }`,
+        })
 
-
-                console.log('rpcsValue', rpcsValue)
-                this.rpcs = {
-                    bsc: rpcsValue.ConfigRPSC.values.bsc_rpc_url,
-                    opt: rpcsValue.ConfigRPSC.values.opt_rpc_url,
-                    solana: rpcsValue.ConfigRPSC.values.solana_rpc_url
-                }
-            }
-
+        console.log('rpcsValue', rpcsValue)
+        this.rpcs = {
+          bsc: rpcsValue.ConfigRPSC.values.bsc_rpc_url,
+          opt: rpcsValue.ConfigRPSC.values.opt_rpc_url,
+          solana: rpcsValue.ConfigRPSC.values.solana_rpc_url,
         }
-        this.config.rpcs = this.rpcs
-        console.log('rpcsValue', this.config.rpcs)
+      }
     }
+    this.config.rpcs = this.rpcs
+    console.log('rpcsValue', this.config.rpcs)
+  }
 
-    initAmount = () => new Promise<void>(async (resolve, reject) => {
-        if (this.amount == undefined || this.amount.split('-').length != 2) {
-            const amountValue: any = await prompt({
-                name: 'ConfigAmount',
-                type: 'snippet',
-                message: 'enter the amount, unit is per mille: [min]-[max]',
-                required: true,
-                template: `#{min}%-#{max}%`
-            })
-            this.amount = amountValue.ConfigAmount.result as string
-        }
-        const amountStr = this.amount.split('-')
-        this.config.amountMin = parseInt(amountStr[0])
-        this.config.amountMax = parseInt(amountStr[1])
+  initAmount = () =>
+    new Promise<void>(async (resolve, reject) => {
+      if (this.amount == undefined || this.amount.split('-').length != 2) {
+        const amountValue: any = await prompt({
+          name: 'ConfigAmount',
+          type: 'snippet',
+          message: 'enter the amount, unit is per mille: [min]-[max]',
+          required: true,
+          template: `#{min}%-#{max}%`,
+        })
+        this.amount = amountValue.ConfigAmount.result as string
+      }
+      const amountStr = this.amount.split('-')
+      this.config.amountMin = parseInt(amountStr[0])
+      this.config.amountMax = parseInt(amountStr[1])
 
-        if (this.config.amountMin < 0 || this.config.amountMin > 1000 || this.config.amountMax < 0 || this.config.amountMax > 1000) {
-            throw new Error("amount of percentage only support 0 ~ 1000");
-        }
-        console.log(`amount of percentage min: ${this.config.amountMin}`)
-        console.log(`amount of percentage max: ${this.config.amountMax}`)
-        resolve()
+      if (
+        this.config.amountMin < 0 ||
+        this.config.amountMin > 1000 ||
+        this.config.amountMax < 0 ||
+        this.config.amountMax > 1000
+      ) {
+        throw new Error('amount of percentage only support 0 ~ 1000')
+      }
+      console.log(`amount of percentage min: ${this.config.amountMin}`)
+      console.log(`amount of percentage max: ${this.config.amountMax}`)
+      resolve()
     })
 
-    initBridge = () => new Promise<void>(async (resolve, reject) => {
-        if (this.bridge != undefined) {
-            if (this.bridge == '') {
-                this.config.bridges = []
-            } else {
-                this.config.bridges = this.bridge.split(',')
-            }
-
-            console.log('bridge range ', this.config.bridges)
+  initBridge = () =>
+    new Promise<void>(async (resolve, reject) => {
+      if (this.bridge != undefined) {
+        if (this.bridge == '') {
+          this.config.bridges = []
         } else {
-            const bridgeValue: { value: string } = (await prompt({
-                type: 'input',
-                name: 'value',
-                message: 'please enter range of bridge, empty is unrestricted'
-            }))
-            this.bridge = bridgeValue.value
-            if (this.bridge != undefined && this.bridge != "") {
-                this.config.bridges = this.bridge.split(',')
-                console.log('bridge range ', this.config.bridges)
-            } else {
-                console.log('unrestricted bridge range')
-            }
-
+          this.config.bridges = this.bridge.split(',')
         }
-        resolve()
-    })
 
-    initPrivateKey = () => new Promise<void>(async (resolve, reject) => {
-        if (this.privateKey == undefined) {
-            const pvKeyValue: { value: string } = (await prompt({
-                type: 'input',
-                name: 'value',
-                message: 'please enter your evm private key for monkey test'
-            }))
-            this.privateKey = pvKeyValue.value
-        }
-        this.config.privateKey = this.privateKey
-
-        const wallet = new ethers.Wallet(this.config.privateKey)
-        this.config.sendingAddress = wallet.address
-
-        console.log(`evm wallet is: ${wallet.address}`)
-        resolve()
-    })
-
-    initSolanaPrivateKey = () => new Promise<void>(async (resolve, reject) => {
-        if (this.solanaPrivateKey == undefined) {
-            const pvKeyValue: { value: string } = (await prompt({
-                type: 'input',
-                name: 'value',
-                message: 'please enter your solana private key for monkey test'
-            }))
-            this.solanaPrivateKey = pvKeyValue.value
-        }
-        this.config.solanaPrivateKey = this.solanaPrivateKey
-
-        const wallet = Keypair.fromSecretKey(Uint8Array.from(Buffer.from(this.config.solanaPrivateKey.startsWith('0x') ? this.config.solanaPrivateKey.slice(2) : this.config.solanaPrivateKey, 'hex')))
-
-        this.config.solanaSendingAddress = wallet.publicKey.toBase58()
-
-        console.log(`solana wallet is: ${wallet.publicKey.toBase58()}`)
-        resolve()
-    })
-
-    initReceivingAddress = () => new Promise<void>(async (resolve, reject) => {
-        if (this.receivingAddress == undefined) {
-            const keyType: { value: string } = await prompt({
-                type: 'select',
-                name: 'value',
-                message: 'evm receiving address is ?',
-                choices: [{
-                    name: 'same as evm test address',
-                    value: ''
-                }, {
-                    name: 'enter a new address',
-                    value: ''
-                }]
-            });
-
-            if (keyType.value == 'same as evm test address') {
-                this.receivingAddress = this.config.sendingAddress
-            } else {
-                const addressValue: { value: string } = (await prompt({
-                    type: 'input',
-                    name: 'value',
-                    message: "please enter your evm wallet address, for receiving DstToken"
-                }))
-                this.receivingAddress = addressValue.value
-            }
-        }
-        this.config.receivingAddress = this.receivingAddress
-        resolve()
-    })
-
-    initSolanaReceivingAddress = () => new Promise<void>(async (resolve, reject) => {
-        if (this.solanaReceivingAddress == undefined) {
-            const keyType: { value: string } = await prompt({
-                type: 'select',
-                name: 'value',
-                message: 'solana receiving address is ?',
-                choices: [{
-                    name: 'same as solana test address',
-                    value: ''
-                }, {
-                    name: 'enter a new address',
-                    value: ''
-                }]
-            });
-
-            if (keyType.value == 'same as solana test address') {
-                this.solanaReceivingAddress = this.config.solanaSendingAddress
-            } else {
-                const addressValue: { value: string } = (await prompt({
-                    type: 'input',
-                    name: 'value',
-                    message: "please enter your solana wallet address, for receiving DstToken"
-                }))
-                this.solanaReceivingAddress = addressValue.value
-            }
-        }
-        this.config.solanaReceivingAddress = this.solanaReceivingAddress
-        resolve()
-    })
-
-    initWebhook = () => new Promise<void>(async (resolve, reject) => {
-        if (this.webhook == undefined) {
-            const webhookValue: { value: string } = (await prompt({
-                type: 'input',
-                name: 'value',
-                message: 'if you want to recevie monkey deal details, enter webhook url'
-            }))
-            this.webhook = webhookValue.value
-        }
-        this.config.webhook = this.webhook
-        console.log(`webhook: ${this.config.webhook}`)
-        resolve()
-    })
-
-    initType = () => new Promise<void>(async (resolve, reject) => {
-        if (this.type == undefined) {
-            const typeValue: { value: string[] } = await prompt({
-                type: 'multiselect',
-                name: 'value',
-                message: 'Select the deal status you want to test.',
-                choices: [
-                    { name: 'succeed', value: 'succeed' },
-                    { name: 'refund', value: 'refund' },
-                    { name: 'cheat amount', value: 'cheat amount' },
-                    { name: 'cheat address', value: 'cheat address' },
-                    { name: 'cheat txin', value: 'cheat txin' }
-                ]
-            })
-            this.config.type = typeValue.value
+        console.log('bridge range ', this.config.bridges)
+      } else {
+        const bridgeValue: {value: string} = await prompt({
+          type: 'input',
+          name: 'value',
+          message: 'please enter range of bridge, empty is unrestricted',
+        })
+        this.bridge = bridgeValue.value
+        if (this.bridge != undefined && this.bridge != '') {
+          this.config.bridges = this.bridge.split(',')
+          console.log('bridge range ', this.config.bridges)
         } else {
-            this.config.type = this.type.split(',')
+          console.log('unrestricted bridge range')
         }
-
-        for (const iterator of this.config.type) {
-            if (iterator != 'succeed' && iterator != 'refund' && iterator != 'cheat amount'
-                && iterator != 'cheat address' && iterator != 'cheat txin'
-            ) {
-                throw new Error(`unknow type: ${iterator}`);
-            }
-        }
-        console.log(`type:`, this.config.type)
-
-        if (this.complaint == undefined) {
-            const complaintValue: { value: string[] } = await prompt({
-                type: 'multiselect',
-                name: 'value',
-                message: 'Select the deal complaint you want to test.',
-                choices: [
-                    { name: 'true', value: 'true' },
-                    { name: 'false', value: 'false' }
-                ]
-            })
-            this.config.complaint = complaintValue.value
-        } else {
-            this.config.complaint = this.complaint.split(',')
-        }
-        console.log(`complaint:`, this.config.complaint)
-
-        resolve()
+      }
+      resolve()
     })
 
-    initLP = () => new Promise<void>(async (resolve, reject) => {
-        if (this.lp == undefined) {
-            const lpValue: { value: string } = (await prompt({
-                type: 'input',
-                name: 'value',
-                message: 'enter lp name for test, empty is unrestricted'
-            }))
-            this.lp = lpValue.value
-        }
-        if (this.lp != undefined && this.lp != "") {
-            this.config.lp = this.lp
-            console.log('lp ', this.config.lp)
-        } else {
-            console.log('unrestricted lp')
-        }
-        resolve()
+  initPrivateKey = () =>
+    new Promise<void>(async (resolve, reject) => {
+      if (this.privateKey == undefined) {
+        const pvKeyValue: {value: string} = await prompt({
+          type: 'input',
+          name: 'value',
+          message: 'please enter your evm private key for monkey test',
+        })
+        this.privateKey = pvKeyValue.value
+      }
+      this.config.privateKey = this.privateKey
+
+      const wallet = new ethers.Wallet(this.config.privateKey)
+      this.config.sendingAddress = wallet.address
+
+      console.log(`evm wallet is: ${wallet.address}`)
+      resolve()
     })
 
-    isBalanceEnough = (bridge: Bridge) => new Promise<boolean>(async (resolve, reject) => {
-        let address = ''
-        if (utils.GetChainType(bridge.src_chain_id) == 'evm') {
-            address = this.config.sendingAddress
-        } else if (utils.GetChainType(bridge.src_chain_id) == 'solana') {
-            address = this.config.solanaSendingAddress
-        }
-        const balance = await assistive.GetBalance(bridge, address, this.config.network,
-            this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()])
-        console.log(`${address} balance on token ${bridge.src_token} is : ${balance}`)
-        if (parseFloat(balance) > 5) {
-            resolve(true)
-        } else {
-            resolve(false)
-        }
+  initSolanaPrivateKey = () =>
+    new Promise<void>(async (resolve, reject) => {
+      if (this.solanaPrivateKey == undefined) {
+        const pvKeyValue: {value: string} = await prompt({
+          type: 'input',
+          name: 'value',
+          message: 'please enter your solana private key for monkey test',
+        })
+        this.solanaPrivateKey = pvKeyValue.value
+      }
+      this.config.solanaPrivateKey = this.solanaPrivateKey
+
+      const wallet = Keypair.fromSecretKey(
+        Uint8Array.from(
+          Buffer.from(
+            this.config.solanaPrivateKey.startsWith('0x')
+              ? this.config.solanaPrivateKey.slice(2)
+              : this.config.solanaPrivateKey,
+            'hex',
+          ),
+        ),
+      )
+
+      this.config.solanaSendingAddress = wallet.publicKey.toBase58()
+
+      console.log(`solana wallet is: ${wallet.publicKey.toBase58()}`)
+      resolve()
     })
 
-    getBalance = (bridge: Bridge) => new Promise<Bignumber>(async (resolve, reject) => {
-        let address = ''
-        if (utils.GetChainType(bridge.src_chain_id) == 'evm') {
-            address = this.config.sendingAddress
-        } else if (utils.GetChainType(bridge.src_chain_id) == 'solana') {
-            address = this.config.solanaSendingAddress
+  initReceivingAddress = () =>
+    new Promise<void>(async (resolve, reject) => {
+      if (this.receivingAddress == undefined) {
+        const keyType: {value: string} = await prompt({
+          type: 'select',
+          name: 'value',
+          message: 'evm receiving address is ?',
+          choices: [
+            {
+              name: 'same as evm test address',
+              value: '',
+            },
+            {
+              name: 'enter a new address',
+              value: '',
+            },
+          ],
+        })
+
+        if (keyType.value == 'same as evm test address') {
+          this.receivingAddress = this.config.sendingAddress
+        } else {
+          const addressValue: {value: string} = await prompt({
+            type: 'input',
+            name: 'value',
+            message: 'please enter your evm wallet address, for receiving DstToken',
+          })
+          this.receivingAddress = addressValue.value
         }
-        const balance = await assistive.GetBalance(bridge, address, this.config.network,
-            this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()])
-        resolve(new Bignumber(balance))
+      }
+      this.config.receivingAddress = this.receivingAddress
+      resolve()
+    })
+
+  initSolanaReceivingAddress = () =>
+    new Promise<void>(async (resolve, reject) => {
+      if (this.solanaReceivingAddress == undefined) {
+        const keyType: {value: string} = await prompt({
+          type: 'select',
+          name: 'value',
+          message: 'solana receiving address is ?',
+          choices: [
+            {
+              name: 'same as solana test address',
+              value: '',
+            },
+            {
+              name: 'enter a new address',
+              value: '',
+            },
+          ],
+        })
+
+        if (keyType.value == 'same as solana test address') {
+          this.solanaReceivingAddress = this.config.solanaSendingAddress
+        } else {
+          const addressValue: {value: string} = await prompt({
+            type: 'input',
+            name: 'value',
+            message: 'please enter your solana wallet address, for receiving DstToken',
+          })
+          this.solanaReceivingAddress = addressValue.value
+        }
+      }
+      this.config.solanaReceivingAddress = this.solanaReceivingAddress
+      resolve()
+    })
+
+  initWebhook = () =>
+    new Promise<void>(async (resolve, reject) => {
+      if (this.webhook == undefined) {
+        const webhookValue: {value: string} = await prompt({
+          type: 'input',
+          name: 'value',
+          message: 'if you want to recevie monkey deal details, enter webhook url',
+        })
+        this.webhook = webhookValue.value
+      }
+      this.config.webhook = this.webhook
+      console.log(`webhook: ${this.config.webhook}`)
+      resolve()
+    })
+
+  initType = () =>
+    new Promise<void>(async (resolve, reject) => {
+      if (this.type == undefined) {
+        const typeValue: {value: string[]} = await prompt({
+          type: 'multiselect',
+          name: 'value',
+          message: 'Select the deal status you want to test.',
+          choices: [
+            {name: 'succeed', value: 'succeed'},
+            {name: 'refund', value: 'refund'},
+            {name: 'cheat amount', value: 'cheat amount'},
+            {name: 'cheat address', value: 'cheat address'},
+            {name: 'cheat txin', value: 'cheat txin'},
+          ],
+        })
+        this.config.type = typeValue.value
+      } else {
+        this.config.type = this.type.split(',')
+      }
+
+      for (const iterator of this.config.type) {
+        if (
+          iterator != 'succeed' &&
+          iterator != 'refund' &&
+          iterator != 'cheat amount' &&
+          iterator != 'cheat address' &&
+          iterator != 'cheat txin'
+        ) {
+          throw new Error(`unknow type: ${iterator}`)
+        }
+      }
+      console.log(`type:`, this.config.type)
+
+      if (this.complaint == undefined) {
+        const complaintValue: {value: string[]} = await prompt({
+          type: 'multiselect',
+          name: 'value',
+          message: 'Select the deal complaint you want to test.',
+          choices: [
+            {name: 'true', value: 'true'},
+            {name: 'false', value: 'false'},
+          ],
+        })
+        this.config.complaint = complaintValue.value
+      } else {
+        this.config.complaint = this.complaint.split(',')
+      }
+      console.log(`complaint:`, this.config.complaint)
+
+      resolve()
+    })
+
+  initLP = () =>
+    new Promise<void>(async (resolve, reject) => {
+      if (this.lp == undefined) {
+        const lpValue: {value: string} = await prompt({
+          type: 'input',
+          name: 'value',
+          message: 'enter lp name for test, empty is unrestricted',
+        })
+        this.lp = lpValue.value
+      }
+      if (this.lp != undefined && this.lp != '') {
+        this.config.lp = this.lp
+        console.log('lp ', this.config.lp)
+      } else {
+        console.log('unrestricted lp')
+      }
+      resolve()
+    })
+
+  isBalanceEnough = (bridge: Bridge) =>
+    new Promise<boolean>(async (resolve, reject) => {
+      let address = ''
+      if (utils.GetChainType(bridge.src_chain_id) == 'evm') {
+        address = this.config.sendingAddress
+      } else if (utils.GetChainType(bridge.src_chain_id) == 'solana') {
+        address = this.config.solanaSendingAddress
+      }
+      const balance = await assistive.GetBalance(
+        bridge,
+        address,
+        this.config.network!,
+        this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()],
+      )
+      console.log(`${address} balance on token ${bridge.src_token} is : ${balance}`)
+      if (parseFloat(balance) > 5) {
+        resolve(true)
+      } else {
+        resolve(false)
+      }
+    })
+
+  getBalance = (bridge: Bridge) =>
+    new Promise<Bignumber>(async (resolve, reject) => {
+      let address = ''
+      if (utils.GetChainType(bridge.src_chain_id) == 'evm') {
+        address = this.config.sendingAddress
+      } else if (utils.GetChainType(bridge.src_chain_id) == 'solana') {
+        address = this.config.solanaSendingAddress
+      }
+      const balance = await assistive.GetBalance(
+        bridge,
+        address,
+        this.config.network!,
+        this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()],
+      )
+      resolve(new Bignumber(balance))
     })
 }

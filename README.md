@@ -1,20 +1,21 @@
-otmoiccli
-=================
+# otmoic-cli
 
 otmoic-cli has functions such as generating account reports, querying quotes, and making exchanges.
-
 
 [![oclif](https://img.shields.io/badge/cli-oclif-brightgreen.svg)](https://oclif.io)
 [![Version](https://img.shields.io/npm/v/otmoiccli.svg)](https://npmjs.org/package/otmoiccli)
 [![Downloads/week](https://img.shields.io/npm/dw/otmoiccli.svg)](https://npmjs.org/package/otmoiccli)
 
-
 <!-- toc -->
-* [Usage](#usage)
-* [Commands](#commands)
+
+- [Usage](#usage)
+- [Commands](#commands)
 <!-- tocstop -->
+
 # Usage
+
 <!-- usage -->
+
 ```sh-session
 $ npm install -g otmoiccli
 $ otmoiccli COMMAND
@@ -26,14 +27,18 @@ USAGE
   $ otmoiccli COMMAND
 ...
 ```
+
 <!-- usagestop -->
+
 # Commands
+
 <!-- commands -->
-* [`otmoiccli ask`](#otmoiccli-ask)
-* [`otmoiccli help [COMMAND]`](#otmoiccli-help-command)
-* [`otmoiccli reportforms`](#otmoiccli-reportforms)
-* [`otmoiccli swap`](#otmoiccli-swap)
-* [`otmoiccli monkey`](#otmoiccli-monkey)
+
+- [`otmoiccli ask`](#otmoiccli-ask)
+- [`otmoiccli help [COMMAND]`](#otmoiccli-help-command)
+- [`otmoiccli reportforms`](#otmoiccli-reportforms)
+- [`otmoiccli swap`](#otmoiccli-swap)
+- [`otmoiccli monkey`](#otmoiccli-monkey)
 
 ## `otmoiccli ask`
 
@@ -133,7 +138,6 @@ The implementation of this command can be found in `src/commands/reportforms.ts`
 
 The `otmoiccli swap` command is used to exchange tokens across different blockchains. This command interacts with various blockchain networks to facilitate token swaps.
 
-
 ### Usage
 
 ```sh
@@ -218,7 +222,7 @@ otmoiccli monkey -i 300-450 -r https://relay.example.com -a 1000-1000 -p <PRIVAT
 
 ### Code Reference
 
-The implementation of this command can be found in `src/commands/monkey.ts` and `monkey_mainnet.sh`. 
+The implementation of this command can be found in `src/commands/monkey.ts` and `monkey_mainnet.sh`.
 
 # Contributing
 
@@ -227,32 +231,37 @@ We welcome contributions to this project! If you are interested in contributing,
 1. **Fork the repository**: Click the "Fork" button at the top right of this page to create a copy of this repository in your GitHub account.
 
 2. **Clone your fork**: Use the following command to clone your forked repository to your local machine:
-    ```sh
-    git clone https://github.com/your-username/Command-Line-Interface.git
-    ```
+
+   ```sh
+   git clone https://github.com/your-username/Command-Line-Interface.git
+   ```
 
 3. **Create a new branch**: Create a new branch for your feature or bugfix:
-    ```sh
-    git checkout -b my-feature-branch
-    ```
+
+   ```sh
+   git checkout -b my-feature-branch
+   ```
 
 4. **Install dependencies**: Navigate to the project directory and install the dependencies:
-    ```sh
-    cd Command-Line-Interface
-    npm install
-    ```
+
+   ```sh
+   cd Command-Line-Interface
+   npm install
+   ```
 
 5. **Make your changes**: Implement your feature or bugfix.
 
 6. **Commit your changes**: Commit your changes with a descriptive commit message:
-    ```sh
-    git commit -am 'Add new feature'
-    ```
+
+   ```sh
+   git commit -am 'Add new feature'
+   ```
 
 7. **Push to your fork**: Push your changes to your forked repository:
-    ```sh
-    git push origin my-feature-branch
-    ```
+
+   ```sh
+   git push origin my-feature-branch
+   ```
 
 8. **Create a pull request**: Open a pull request from your forked repository to the main repository.
 
