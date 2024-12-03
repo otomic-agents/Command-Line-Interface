@@ -7,7 +7,6 @@ import {
   PreBusiness,
   Quote,
   Relay,
-  SwapSignData,
   assistive,
   utils,
   business as Business,
@@ -930,7 +929,7 @@ export default class MonkeyActuator {
           ) {
             const resp = await Business.transferOut(dealInfo.business!, this.config.network!, dealInfo.srcRpc, {
               type: 'privateKey',
-              privateKey: this.config.privateKey,
+              privateKey: this.config.solanaPrivateKey,
               useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
             })
             task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
