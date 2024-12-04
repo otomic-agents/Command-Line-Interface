@@ -930,7 +930,6 @@ export default class MonkeyActuator {
             const resp = await Business.transferOut(dealInfo.business!, this.config.network!, dealInfo.srcRpc, {
               type: 'privateKey',
               privateKey: this.config.solanaPrivateKey,
-              useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
             })
             task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
             task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
@@ -1030,7 +1029,6 @@ export default class MonkeyActuator {
                 {
                   type: 'privateKey',
                   privateKey: this.config.solanaPrivateKey,
-                  useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
                 },
               )
               task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
@@ -1126,7 +1124,6 @@ export default class MonkeyActuator {
                 {
                   type: 'privateKey',
                   privateKey: this.config.solanaPrivateKey,
-                  useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
                 },
               )
               task.title = `${task.title} -- user cheat confirm in -- ${(resp as ResponseSolana).txHash}`
@@ -1250,7 +1247,6 @@ export default class MonkeyActuator {
             const resp = await Business.transferOutRefund(dealInfo.business!, this.config.network!, dealInfo.srcRpc, {
               type: 'privateKey',
               privateKey: this.config.solanaPrivateKey,
-              useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
             })
             task.output = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
             task.title = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
