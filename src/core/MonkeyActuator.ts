@@ -269,7 +269,7 @@ export default class MonkeyActuator {
         srcRpc: undefined,
         dstRpc: undefined,
         signData: undefined,
-        step: undefined,
+        step: Step.WaitTransferOut,
         socketId: undefined,
       }
 
@@ -397,7 +397,7 @@ export default class MonkeyActuator {
                     }
                   }
 
-                  if (dealInfo.business && dealInfo.type?.startsWith('cheat') && dealInfo.complaint == true) {
+                  if (dealInfo.step! > Step.WaitTransferOut && dealInfo.business && dealInfo.type?.startsWith('cheat') && dealInfo.complaint == true) {
                     await this.taskExchangeComplaint(task, dealInfo)
                   }
                 }
@@ -972,7 +972,7 @@ export default class MonkeyActuator {
         await delay(2000)
         const resp = await getBusinessRetry(relay, dealInfo.business!.hash)
         task.output = `waiting... step: ${resp.step}`
-        succeed = resp.step >= Step.LpTransferIn
+        succeed = resp.step == Step.LpTransferIn
 
         if (succeed) {
           //get business data and show txhash
