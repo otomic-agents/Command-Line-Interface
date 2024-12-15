@@ -1330,7 +1330,7 @@ export default class MonkeyActuator {
         })
         this.network = netValue.value
       }
-      this.config.network = NetworkType[this.network as keyof typeof NetworkType]
+      this.config.network = NetworkType[this.network.toUpperCase() as keyof typeof NetworkType]
       console.log('network', this.config.network)
 
       resolve()
@@ -1682,7 +1682,7 @@ export default class MonkeyActuator {
         this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()],
       )
       console.log(`${address} balance on token ${bridge.src_token} is : ${balance}`)
-      if (parseFloat(balance) > 5) {
+      if (parseFloat(balance) > 0.0001) {
         resolve(true)
       } else {
         resolve(false)

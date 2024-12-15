@@ -7,7 +7,7 @@ export default class GetBridgeActuator {
 
   fetching: boolean = true
 
-  network: NetworkType
+  network: string
 
   rpcs: {
     [key: string]: string
@@ -17,7 +17,7 @@ export default class GetBridgeActuator {
 
   constructor(
     relayUrl: string,
-    network: NetworkType,
+    network: string,
     rpcs: {
       [key: string]: string
     },
@@ -75,9 +75,10 @@ export default class GetBridgeActuator {
       // const bridges: Bridge[] = bridgeList.filter(b => b.src_chain_id != 501 && b.dst_chain_id != 501)
 
       // console.log('bridgeList', bridgeList)
-      console.log('network', this.network)
+      let networkConfig = NetworkType[this.network.toUpperCase() as keyof typeof NetworkType]
+      console.log('networkConfig', networkConfig)
       console.log('rpcs', this.rpcs)
-      this.translateBridges = await assistive.TranslateBridge(bridgeList, this.network, this.rpcs)
+      this.translateBridges = await assistive.TranslateBridge(bridgeList, networkConfig, this.rpcs)
 
       const table = new Table()
 

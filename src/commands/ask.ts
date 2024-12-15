@@ -38,7 +38,7 @@ export default class Ask extends Command {
 
     const askActuator = new AskActuator(
       relayUrl,
-      NetworkType[network as keyof typeof NetworkType],
+      network,
       chainRpc,
       bridgeName,
       amount,

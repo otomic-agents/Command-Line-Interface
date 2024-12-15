@@ -19,7 +19,8 @@ import {
 export default class SwapActuator {
   relayUrl: string | undefined
 
-  network: NetworkType | undefined
+  network: string | undefined
+  networkConfig: NetworkType | undefined
 
   rpcs: {
     [key: string]: string
@@ -49,7 +50,7 @@ export default class SwapActuator {
 
   constructor(
     relayUrl: string | undefined,
-    network: NetworkType | undefined,
+    network: string | undefined,
     rpcs: string | undefined,
     bridgeName: string | undefined,
     amount: string | undefined,
@@ -69,6 +70,7 @@ export default class SwapActuator {
   initConfig = () => {
     this.relayUrl = this.askActuator.relayUrl
     this.network = this.askActuator.network
+    this.networkConfig = this.askActuator.networkConfig
     this.rpcs = this.askActuator.rpcs
     this.bridgeName = this.askActuator.bridgeName
     this.amount = this.askActuator.amount
@@ -184,7 +186,7 @@ export default class SwapActuator {
 
   sign = () =>
     new Promise<SwapSignedData>(async (resolve, reject) => {
-      if (this.network == undefined) {
+      if (this.networkConfig == undefined) {
         throw new Error('network is undefined')
       }
       if (this.quote == undefined) {
@@ -204,7 +206,7 @@ export default class SwapActuator {
       this.dstRpc = this.rpcs[utils.GetChainName(this.quote.quote_base.bridge.dst_chain_id).toLowerCase()]
 
       const signData: SwapSignedData = (await Business.signQuote(
-        this.network,
+        this.networkConfig,
         this.quote,
         this.amount,
         0,
@@ -319,11 +321,11 @@ export default class SwapActuator {
                 throw new Error('sender private key is undefined')
               }
 
-              if (this.network == undefined) {
+              if (this.networkConfig == undefined) {
                 throw new Error('network is undefined')
               }
 
-              const resp = await Business.transferOut(business, this.network, this.srcRpc, {
+              const resp = await Business.transferOut(business, this.networkConfig, this.srcRpc, {
                 type: 'privateKey',
                 privateKey: this.privateKeyForSend,
                 useMaximumGasPriceAtMost: this.useMaximumGasPriceAtMost,
@@ -390,12 +392,12 @@ export default class SwapActuator {
               if (this.privateKeyForSend == undefined) {
                 throw new Error('sender private key is undefined')
               }
-              if (this.network == undefined) {
+              if (this.networkConfig == undefined) {
                 throw new Error('network is undefined')
               }
 
               if (utils.GetChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
-                const resp = await Business.transferOutConfirm(business, this.network, this.srcRpc, {
+                const resp = await Business.transferOutConfirm(business, this.networkConfig, this.srcRpc, {
                   type: 'privateKey',
                   privateKey: this.privateKeyForSend,
                   useMaximumGasPriceAtMost: this.useMaximumGasPriceAtMost,
@@ -404,7 +406,7 @@ export default class SwapActuator {
               } else if (
                 utils.GetChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana'
               ) {
-                const resp = await Business.transferOutConfirm(business, this.network, this.srcRpc, {
+                const resp = await Business.transferOutConfirm(business, this.networkConfig, this.srcRpc, {
                   type: 'privateKey',
                   privateKey: this.privateKeyForSend,
                   useMaximumGasPriceAtMost: this.useMaximumGasPriceAtMost,

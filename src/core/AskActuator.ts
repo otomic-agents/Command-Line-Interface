@@ -7,7 +7,8 @@ import Table from 'cli-table3'
 export default class AskActuator {
   relayUrl: string | undefined
 
-  network: NetworkType | undefined
+  network: string | undefined
+  networkConfig: NetworkType | undefined
 
   rpcs: {
     [key: string]: string
@@ -21,7 +22,7 @@ export default class AskActuator {
 
   constructor(
     relayUrl: string | undefined,
-    network: NetworkType | undefined,
+    network: string | undefined,
     rpcs: string | undefined,
     bridgeName: string | undefined,
     amount: string | undefined,
@@ -46,7 +47,7 @@ export default class AskActuator {
   }
 
   initNetwork = async () => {
-    if (this.network == undefined || (this.network != NetworkType.MAINNET && this.network != NetworkType.TESTNET)) {
+    if (this.network == undefined || (this.network != 'mainnet' && this.network != 'testnet')) {
       const netValue: {value: string} = await prompt({
         type: 'select',
         name: 'value',
@@ -56,9 +57,11 @@ export default class AskActuator {
           {name: 'testnet', value: 'testnet'},
         ],
       })
-      this.network = NetworkType[netValue.value as keyof typeof NetworkType]
+      this.networkConfig = NetworkType[netValue.value.toUpperCase() as keyof typeof NetworkType]
+    } else {
+      this.networkConfig = NetworkType[this.network.toUpperCase() as keyof typeof NetworkType]
     }
-    console.log('network', this.network)
+    console.log('network config', this.networkConfig)
   }
 
   initChainRpc = async () => {
@@ -101,11 +104,11 @@ export default class AskActuator {
       if (this.relayUrl == undefined) {
         throw new Error('know error, relayUrl is undefined')
       }
-      if (this.network == undefined) {
+      if (this.networkConfig == undefined) {
         throw new Error('know error, network is undefined')
       }
 
-      const getBridge = new GetBridgeActuator(this.relayUrl, this.network, this.rpcs)
+      const getBridge = new GetBridgeActuator(this.relayUrl, this.networkConfig, this.rpcs)
       const bridgeInfo = await getBridge.run()
       if (bridgeInfo == undefined) {
         throw new Error('get bridge info from relay failed')
