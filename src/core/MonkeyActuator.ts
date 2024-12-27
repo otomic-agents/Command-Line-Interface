@@ -1682,7 +1682,7 @@ export default class MonkeyActuator {
         this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()],
       )
       console.log(`${address} balance on token ${bridge.src_token} is : ${balance}`)
-      if (parseFloat(balance) > 0.0001) {
+      if (parseFloat(balance) > 0.002) {
         resolve(true)
       } else {
         resolve(false)
