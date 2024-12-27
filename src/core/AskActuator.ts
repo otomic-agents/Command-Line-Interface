@@ -1,8 +1,10 @@
-import {Quote, Relay, TranslatedBridge, utils, NetworkType} from 'otmoic-sdk'
+import Otmoic, {Quote, TranslatedBridge, NetworkType} from 'otmoic-sdk'
 import GetBridgeActuator from './GetBridgeActuator'
 import {prompt} from 'enquirer'
 import {Listr, delay} from 'listr2'
 import Table from 'cli-table3'
+
+const {utils} = Otmoic
 
 export default class AskActuator {
   relayUrl: string | undefined
@@ -128,7 +130,7 @@ export default class AskActuator {
         throw new Error('no amount entered')
       }
 
-      const relay = new Relay(this.relayUrl)
+      const relay = new Otmoic.Relay(this.relayUrl)
 
       const quotes: Quote[] = []
 
@@ -179,7 +181,7 @@ export default class AskActuator {
       const choices = []
       for (const iterator of bridgeInfo) {
         choices.push({
-          name: `${iterator.srcChainName}---${iterator.src_token}(${iterator.srcTokenSymbol})-->${iterator.dstChainName}---${iterator.dst_token}(${iterator.dstTokenSymbol})`,
+          name: `${iterator.src_chain_name}---${iterator.src_token}(${iterator.src_token_symbol})-->${iterator.dst_chain_name}---${iterator.dst_token}(${iterator.dst_token_symbol})`,
           value: '',
         })
       }
@@ -199,10 +201,10 @@ export default class AskActuator {
       let choosed: TranslatedBridge | undefined = undefined
       for (const iterator of bridgeInfo) {
         if (
-          srcChain == iterator.srcChainName &&
-          srcToken == `${iterator.src_token}(${iterator.srcTokenSymbol})` &&
-          dstChain == iterator.dstChainName &&
-          dstToken == `${iterator.dst_token}(${iterator.dstTokenSymbol})`
+          srcChain == iterator.src_chain_name &&
+          srcToken == `${iterator.src_token}(${iterator.src_token_symbol})` &&
+          dstChain == iterator.dst_chain_name &&
+          dstToken == `${iterator.dst_token}(${iterator.dst_token_symbol})`
         ) {
           choosed = iterator
         }

@@ -61,6 +61,8 @@ export default class Monkey extends Command {
       char: 'g',
       description: 'use the defined maximum gas price if exceeds. usd -g if want to enable it',
     }),
+
+    mode: Flags.string({char: 'm', description: 'mode: singlechain / atomic'}),
   }
 
   public async run(): Promise<void> {
@@ -82,6 +84,7 @@ export default class Monkey extends Command {
     let solanaReceivingAddress = flags.solanaTo
     let debug = flags.debug
     let useMaximumGasPriceAtMost = flags.useMaximumGasPriceAtMost
+    let mode = flags.mode
 
     let monkeyActuator = new MonkeyActuator(
       interval,
@@ -100,6 +103,7 @@ export default class Monkey extends Command {
       solanaReceivingAddress,
       debug,
       useMaximumGasPriceAtMost,
+      mode,
     )
     monkeyActuator.run()
   }

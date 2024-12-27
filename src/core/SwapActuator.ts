@@ -2,19 +2,19 @@ import {Listr, delay} from 'listr2'
 import AskActuator from './AskActuator'
 import {prompt} from 'enquirer'
 import {ethers} from 'ethers'
-import {
+import Otmoic, {
   PreBusiness,
   Quote,
-  Relay,
   SwapSignedData,
-  business as Business,
-  utils,
   ResponseSolana,
   ResponseTransferOut,
   NetworkType,
   Business as BusinessType,
   BusinessFullData,
+  SwapType,
 } from 'otmoic-sdk'
+
+const {utils, business} = Otmoic
 
 export default class SwapActuator {
   relayUrl: string | undefined
@@ -205,7 +205,7 @@ export default class SwapActuator {
       this.srcRpc = this.rpcs[utils.GetChainName(this.quote.quote_base.bridge.src_chain_id).toLowerCase()]
       this.dstRpc = this.rpcs[utils.GetChainName(this.quote.quote_base.bridge.dst_chain_id).toLowerCase()]
 
-      const signData: SwapSignedData = (await Business.signQuote(
+      const signData: SwapSignedData = (await business.signQuote(
         this.networkConfig,
         this.quote,
         this.amount,
@@ -217,6 +217,7 @@ export default class SwapActuator {
         this.srcRpc,
         this.dstRpc,
         {
+          swapType: SwapType.ATOMIC,
           type: 'privateKey',
           privateKey: this.privateKeyForSign,
         },
@@ -240,10 +241,10 @@ export default class SwapActuator {
       if (this.relayUrl == undefined) {
         throw new Error('relay url is undefined')
       }
-      const relay = new Relay(this.relayUrl)
+      const relay = new Otmoic.Relay(this.relayUrl)
 
       let signData: SwapSignedData | undefined = undefined
-      let business: PreBusiness | undefined = undefined
+      let preBusiness: PreBusiness | undefined = undefined
       let step = 0
 
       let taskNow: any | undefined = undefined
@@ -288,16 +289,16 @@ export default class SwapActuator {
                 throw new Error('sign data is undefined')
               }
 
-              business = await relay.swap(this.quote, signData.signData, signData.signed)
+              preBusiness = await relay.swap(this.quote, signData.signData, signData.signed, SwapType.ATOMIC)
 
-              if (!business) {
-                throw new Error(`failed to get business from relay: ${JSON.stringify(business)}`)
+              if (!preBusiness) {
+                throw new Error(`failed to get business from relay: ${JSON.stringify(preBusiness)}`)
               }
-              if (business.locked == false) {
-                throw new Error(`lp lock failed: ${JSON.stringify(business)}`)
+              if (preBusiness.locked == false) {
+                throw new Error(`lp lock failed: ${JSON.stringify(preBusiness)}`)
               }
 
-              task.title = `${task.title} -- preimage:${business.preimage}, hashlock evm:${business.hashlock_evm}, bidid:${business.hash}`
+              task.title = `${task.title} -- preimage:${preBusiness.preimage}, hashlock evm:${preBusiness.hashlock_evm}, bidid:${preBusiness.hash}`
 
               step = 2
             },
@@ -313,8 +314,8 @@ export default class SwapActuator {
 
               task.output = 'sending...'
 
-              if (business == undefined) {
-                throw new Error('business is undefined')
+              if (preBusiness == undefined) {
+                throw new Error('preBusiness is undefined')
               }
 
               if (this.privateKeyForSend == undefined) {
@@ -325,15 +326,17 @@ export default class SwapActuator {
                 throw new Error('network is undefined')
               }
 
-              const resp = await Business.transferOut(business, this.networkConfig, this.srcRpc, {
+              const resp = await business.transferOut(preBusiness, this.networkConfig, this.srcRpc, {
                 type: 'privateKey',
                 privateKey: this.privateKeyForSend,
                 useMaximumGasPriceAtMost: this.useMaximumGasPriceAtMost,
               })
-              if (utils.GetChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
+              if (
+                utils.GetChainType(preBusiness.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm'
+              ) {
                 task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
               } else if (
-                utils.GetChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana'
+                utils.GetChainType(preBusiness.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana'
               ) {
                 task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
               }
@@ -352,7 +355,7 @@ export default class SwapActuator {
 
               task.output = 'waiting...'
 
-              if (business == undefined) {
+              if (preBusiness == undefined) {
                 throw new Error('business is undefined')
               }
 
@@ -360,12 +363,12 @@ export default class SwapActuator {
 
               while (succeed == false) {
                 await delay(500)
-                const resp = (await relay.getBusiness(business.hash)) as BusinessType
+                const resp = (await relay.getBusiness(preBusiness.hash)) as BusinessType
                 task.output = `waiting... step: ${resp.step}`
                 succeed = resp.step >= 3
                 if (succeed) {
                   //get business data and show txhash
-                  const businessFull = (await relay.getBusiness(business.hash, {detailed: true})) as BusinessFullData
+                  const businessFull = (await relay.getBusiness(preBusiness.hash, {detailed: true})) as BusinessFullData
                   if (businessFull.event_transfer_in && businessFull.event_transfer_in.transfer_info) {
                     task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in.transfer_info).transactionHash}`
                   }
@@ -386,7 +389,7 @@ export default class SwapActuator {
 
               task.output = 'sending...'
 
-              if (business == undefined) {
+              if (preBusiness == undefined) {
                 throw new Error('business is undefined')
               }
               if (this.privateKeyForSend == undefined) {
@@ -396,17 +399,19 @@ export default class SwapActuator {
                 throw new Error('network is undefined')
               }
 
-              if (utils.GetChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm') {
-                const resp = await Business.transferOutConfirm(business, this.networkConfig, this.srcRpc, {
+              if (
+                utils.GetChainType(preBusiness.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm'
+              ) {
+                const resp = await business.transferOutConfirm(preBusiness, this.networkConfig, this.srcRpc, {
                   type: 'privateKey',
                   privateKey: this.privateKeyForSend,
                   useMaximumGasPriceAtMost: this.useMaximumGasPriceAtMost,
                 })
                 task.title = `${task.title} -- ${(resp as ethers.ContractTransactionResponse).hash}`
               } else if (
-                utils.GetChainType(business.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana'
+                utils.GetChainType(preBusiness.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'solana'
               ) {
-                const resp = await Business.transferOutConfirm(business, this.networkConfig, this.srcRpc, {
+                const resp = await business.transferOutConfirm(preBusiness, this.networkConfig, this.srcRpc, {
                   type: 'privateKey',
                   privateKey: this.privateKeyForSend,
                   useMaximumGasPriceAtMost: this.useMaximumGasPriceAtMost,
@@ -430,18 +435,18 @@ export default class SwapActuator {
 
               let succeed = false
 
-              if (business == undefined) {
+              if (preBusiness == undefined) {
                 throw new Error('business is undefined')
               }
 
               while (succeed == false) {
                 await delay(500)
-                const resp = (await relay.getBusiness(business.hash)) as BusinessType
+                const resp = (await relay.getBusiness(preBusiness.hash)) as BusinessType
                 task.output = `waiting... step: ${resp.step}`
                 succeed = resp.step >= 5
                 if (succeed) {
                   //get business data and show txhash
-                  const businessFull = (await relay.getBusiness(business.hash, {detailed: true})) as BusinessFullData
+                  const businessFull = (await relay.getBusiness(preBusiness.hash, {detailed: true})) as BusinessFullData
                   if (businessFull.event_transfer_in_confirm && businessFull.event_transfer_in_confirm.transfer_info) {
                     task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_confirm.transfer_info).transactionHash}`
                   }

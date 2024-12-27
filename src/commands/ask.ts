@@ -36,13 +36,7 @@ export default class Ask extends Command {
     let bridgeName = flags.bridge
     let amount = flags.amount
 
-    const askActuator = new AskActuator(
-      relayUrl,
-      network,
-      chainRpc,
-      bridgeName,
-      amount,
-    )
+    const askActuator = new AskActuator(relayUrl, network, chainRpc, bridgeName, amount)
     const quote = await askActuator.run()
     console.log('choosed quote', quote)
 

@@ -1,4 +1,4 @@
-import {Bridge, Relay, assistive, TranslatedBridge, NetworkType} from 'otmoic-sdk'
+import Otmoic, {TranslatedBridge, NetworkType} from 'otmoic-sdk'
 import Table from 'cli-table3'
 import {delay, Listr} from 'listr2'
 
@@ -71,24 +71,26 @@ export default class GetBridgeActuator {
 
   startTask = () =>
     new Promise<void>(async (resolve, reject) => {
-      const bridgeList: Bridge[] = await new Relay(this.relayUrl).getBridge()
       // const bridges: Bridge[] = bridgeList.filter(b => b.src_chain_id != 501 && b.dst_chain_id != 501)
 
       // console.log('bridgeList', bridgeList)
       let networkConfig = NetworkType[this.network.toUpperCase() as keyof typeof NetworkType]
       console.log('networkConfig', networkConfig)
       console.log('rpcs', this.rpcs)
-      this.translateBridges = await assistive.TranslateBridge(bridgeList, networkConfig, this.rpcs)
+      this.translateBridges = (await new Otmoic.Relay(this.relayUrl).getBridge({
+        detailed: true,
+        network: networkConfig,
+      })) as TranslatedBridge[]
 
       const table = new Table()
 
       for (const b of this.translateBridges) {
         table.push([
-          `${b.srcChainName}(${b.src_chain_id})`,
-          `${b.srcTokenSymbol}(${b.src_token})`,
+          `${b.src_chain_name}(${b.src_chain_id})`,
+          `${b.src_token_symbol}(${b.src_token})`,
           '-->',
-          `${b.dstChainName}(${b.dst_chain_id})`,
-          `${b.dstTokenSymbol}(${b.dst_token})`,
+          `${b.dst_chain_name}(${b.dst_chain_id})`,
+          `${b.dst_token_symbol}(${b.dst_token})`,
         ])
       }
 
