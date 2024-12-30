@@ -17,7 +17,7 @@ import Otmoic, {
 import Bignumber from 'bignumber.js'
 import needle from 'needle'
 import retry from 'async-retry'
-import {objectToString, getFormattedDateTime, sanitizeForJSON} from '../utils/flattenObject'
+import {objectToString, getFormattedDateTime, sanitizeForJSON, isZeroAddress} from '../utils/flattenObject'
 
 const {utils, business} = Otmoic
 
@@ -1070,7 +1070,7 @@ export default class MonkeyActuator {
         if (succeed) {
           //get business data and show txhash
           const businessFull = await getBusinessFullRetry(relay, dealInfo.preBusiness.hash, this.config.mode)
-          if (businessFull.event_transfer_in && businessFull.event_transfer_in.transfer_info) {
+          if (businessFull && businessFull.event_transfer_in && businessFull.event_transfer_in.transfer_info) {
             if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
               task.title = `${task.title} -- lp should not send tx in for the case - ${JSON.parse(businessFull.event_transfer_in.transfer_info).transactionHash}`
             } else {
@@ -1184,8 +1184,10 @@ export default class MonkeyActuator {
 
         const businessFull = await getBusinessFullRetry(relay, dealInfo.preBusiness.hash, this.config.mode)
         let sender: string | undefined
-        if (businessFull.event_transfer_in && businessFull.event_transfer_in.sender) {
+        if (businessFull && businessFull.event_transfer_in && businessFull.event_transfer_in.sender) {
           sender = businessFull.event_transfer_in.sender
+        } else {
+          throw new Error('getBusinessFull failed to return data with event_transfer_in info')
         }
         if (sender === undefined) {
           throw new Error('failed to get sender address')
@@ -1276,8 +1278,10 @@ export default class MonkeyActuator {
         if (succeed) {
           //get business data and show txhash
           const businessFull = await getBusinessFullRetry(relay, dealInfo.preBusiness.hash, this.config.mode)
-          if (businessFull.event_transfer_in_confirm && businessFull.event_transfer_in_confirm.transfer_info) {
+          if (businessFull && businessFull.event_transfer_in_confirm && businessFull.event_transfer_in_confirm.transfer_info) {
             task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_confirm.transfer_info).transactionHash}`
+          } else {
+            throw new Error('getBusinessFull failed to return data with event_transfer_in_confirm info')
           }
         }
       }
@@ -1308,8 +1312,10 @@ export default class MonkeyActuator {
         if (succeed) {
           //get business data and show txhash
           const businessFull = await getBusinessFullRetry(relay, dealInfo.preBusiness.hash, this.config.mode)
-          if (businessFull.event_transfer_out_confirm && businessFull.event_transfer_out_confirm.transfer_info) {
+          if (businessFull && businessFull.event_transfer_out_confirm && businessFull.event_transfer_out_confirm.transfer_info) {
             task.title = `${task.title} - relay tx out confirm -- ${JSON.parse(businessFull.event_transfer_out_confirm.transfer_info).transactionHash}`
+          } else {
+            throw new Error('getBusinessFull failed to return data with event_transfer_out_confirm info')
           }
         }
       }
@@ -1406,8 +1412,10 @@ export default class MonkeyActuator {
         if (succeed) {
           //get business data and show txhash
           const businessFull = await getBusinessFullRetry(relay, dealInfo.preBusiness.hash, this.config.mode)
-          if (businessFull.event_transfer_in_refund && businessFull.event_transfer_in_refund.transfer_info) {
+          if (businessFull && businessFull.event_transfer_in_refund && businessFull.event_transfer_in_refund.transfer_info) {
             task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_refund.transfer_info).transactionHash}`
+          } else {
+            throw new Error('getBusinessFull failed to return data with event_transfer_in_refund info')
           }
         }
       }
@@ -1516,7 +1524,7 @@ export default class MonkeyActuator {
         if (succeed) {
           //get business data and show txhash
           const businessFull = await getBusinessFullRetry(relay, dealInfo.preBusiness.hash, this.config.mode)
-          if (businessFull.event_confirm_swap && businessFull.event_confirm_swap.transfer_info) {
+          if (businessFull && businessFull.event_confirm_swap && businessFull.event_confirm_swap.transfer_info) {
             task.title = `${task.title} -- ${JSON.parse(businessFull.event_confirm_swap.transfer_info).transactionHash}`
           } else {
             throw new Error('getBusinessFull failed to return data with event_confirm_swap info')
@@ -1979,10 +1987,18 @@ export default class MonkeyActuator {
         this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()],
       )
       console.log(`${address} balance on token ${bridge.src_token} is : ${balance}`)
-      if (parseFloat(balance) > 0.002) {
-        resolve(true)
+      if (isZeroAddress(bridge.src_token)) {
+        if (parseFloat(balance) > 0.002) {
+          resolve(true)
+        } else {
+          resolve(false)
+        }
       } else {
-        resolve(false)
+        if (parseFloat(balance) > 0.0001) {
+          resolve(true)
+        } else {
+          resolve(false)
+        }
       }
     })
 

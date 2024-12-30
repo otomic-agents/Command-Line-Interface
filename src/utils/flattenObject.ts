@@ -33,3 +33,9 @@ export function getFormattedDateTime() {
 export function sanitizeForJSON(str: string) {
   return str.replace(/[\n"&\r\t\b\f{}`']/g, ' ')
 }
+
+const ZeroAddress: string = "0x0000000000000000000000000000000000000000";
+
+export function isZeroAddress(address: string): boolean {
+  return address == ZeroAddress || Number(address) == 0;
+}
