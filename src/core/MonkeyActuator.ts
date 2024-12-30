@@ -427,13 +427,19 @@ export default class MonkeyActuator {
                       await this.taskExchangeComplaint(task, dealInfo)
                     }
                   } else if (this.config.mode == SwapType.SINGLECHAIN) {
-                    if (dealInfo.singleSwapStep == SingleSwapStep.SwapCreated) {
-                      task.output = `init swap is failed to on chain`
-                      await this.callWebHookFailed(task, relay, dealInfo)
+                    if (dealInfo.singleSwapStep! < SingleSwapStep.SwapInited) {
+                      if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
+                        await this.taskExchangeRefundSwap(task, dealInfo)
+                        await this.callWebHookSucceed(task, relay, dealInfo)
+                      } else {
+                        task.output = `init swap is failed to on chain`
+                        await this.callWebHookFailed(task, relay, dealInfo)
+                      }
                     }
 
-                    if (dealInfo.singleSwapStep == SingleSwapStep.SwapInited) {
-                      task.output = 'cannot get confirm swap from lp, going to refund swap'
+                    if (dealInfo.singleSwapStep! == SingleSwapStep.SwapInited) {
+                      task.output =
+                      'cannot get confirm swap event from lp at task timeout -- going to refund tx out'
                       await this.taskExchangeRefundSwap(task, dealInfo)
                       await this.callWebHookFailed(task, relay, dealInfo)
                     }
@@ -1450,6 +1456,21 @@ export default class MonkeyActuator {
 
       if (dealInfo.preBusiness == undefined) {
         throw new Error('preBusiness is undefined')
+      }
+
+      if (dealInfo.type == 'cheat amount') {
+        const dArr = dealInfo.preBusiness.swap_asset_information.amount.split('.')
+        const d = dArr.length == 2 ? [dArr].length : 0
+        dealInfo.preBusiness.swap_asset_information.amount = new Bignumber(
+          dealInfo.preBusiness.swap_asset_information.amount,
+        )
+          .times(0.8)
+          .toFixed(d)
+      }
+
+      if (dealInfo.type == 'cheat address') {
+        dealInfo.preBusiness.swap_asset_information.quote.quote_base.lp_bridge_address =
+          dealInfo.preBusiness.swap_asset_information.sender
       }
 
       await retry(
