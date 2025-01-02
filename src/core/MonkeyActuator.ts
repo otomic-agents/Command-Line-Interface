@@ -48,7 +48,7 @@ async function getBusinessFullRetry(relay: Otmoic.Relay, businessHash: string, s
       async () => {
         let businessFull = (await relay.getBusiness(businessHash, {
           detailed: true,
-          swapType: swapType
+          swapType: swapType,
         })) as BusinessFullData
         resolve(businessFull)
       },
@@ -438,8 +438,7 @@ export default class MonkeyActuator {
                     }
 
                     if (dealInfo.singleSwapStep! == SingleSwapStep.SwapInited) {
-                      task.output =
-                      'cannot get confirm swap event from lp at task timeout -- going to refund tx out'
+                      task.output = 'cannot get confirm swap event from lp at task timeout -- going to refund tx out'
                       await this.taskExchangeRefundSwap(task, dealInfo)
                       await this.callWebHookFailed(task, relay, dealInfo)
                     }
@@ -799,6 +798,10 @@ export default class MonkeyActuator {
       })
       // .filter(b => (b.src_chain_id != 501 && b.dst_chain_id != 501))
 
+      if (bridgeList.length == 0) {
+        throw new Error('got 0 bridges, no bridge to swap')
+      }
+
       task.output = `bridge size: ${bridgeList.length}, check token balance`
 
       const enoughList: Bridge[] = []
@@ -950,7 +953,7 @@ export default class MonkeyActuator {
             privateKey: privateKey,
           },
         )) as SwapSignedData
-      
+
         console.log(`sign data`, dealInfo.signData)
 
         dealInfo.preBusiness = await relay.swap(
@@ -1284,7 +1287,11 @@ export default class MonkeyActuator {
         if (succeed) {
           //get business data and show txhash
           const businessFull = await getBusinessFullRetry(relay, dealInfo.preBusiness.hash, this.config.mode)
-          if (businessFull && businessFull.event_transfer_in_confirm && businessFull.event_transfer_in_confirm.transfer_info) {
+          if (
+            businessFull &&
+            businessFull.event_transfer_in_confirm &&
+            businessFull.event_transfer_in_confirm.transfer_info
+          ) {
             task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_confirm.transfer_info).transactionHash}`
           } else {
             throw new Error('getBusinessFull failed to return data with event_transfer_in_confirm info')
@@ -1318,7 +1325,11 @@ export default class MonkeyActuator {
         if (succeed) {
           //get business data and show txhash
           const businessFull = await getBusinessFullRetry(relay, dealInfo.preBusiness.hash, this.config.mode)
-          if (businessFull && businessFull.event_transfer_out_confirm && businessFull.event_transfer_out_confirm.transfer_info) {
+          if (
+            businessFull &&
+            businessFull.event_transfer_out_confirm &&
+            businessFull.event_transfer_out_confirm.transfer_info
+          ) {
             task.title = `${task.title} - relay tx out confirm -- ${JSON.parse(businessFull.event_transfer_out_confirm.transfer_info).transactionHash}`
           } else {
             throw new Error('getBusinessFull failed to return data with event_transfer_out_confirm info')
@@ -1418,7 +1429,11 @@ export default class MonkeyActuator {
         if (succeed) {
           //get business data and show txhash
           const businessFull = await getBusinessFullRetry(relay, dealInfo.preBusiness.hash, this.config.mode)
-          if (businessFull && businessFull.event_transfer_in_refund && businessFull.event_transfer_in_refund.transfer_info) {
+          if (
+            businessFull &&
+            businessFull.event_transfer_in_refund &&
+            businessFull.event_transfer_in_refund.transfer_info
+          ) {
             task.title = `${task.title} -- ${JSON.parse(businessFull.event_transfer_in_refund.transfer_info).transactionHash}`
           } else {
             throw new Error('getBusinessFull failed to return data with event_transfer_in_refund info')
@@ -2009,7 +2024,7 @@ export default class MonkeyActuator {
       )
       console.log(`${address} balance on token ${bridge.src_token} is : ${balance}`)
       if (isZeroAddress(bridge.src_token)) {
-        if (parseFloat(balance) > 0.002) {
+        if (parseFloat(balance) > 0.004) {
           resolve(true)
         } else {
           resolve(false)
