@@ -364,7 +364,12 @@ export default class MonkeyActuator {
         }
         await this.callWebHookFailed(task, relay, dealInfo)
         console.error(reason)
-        process.exit(1)
+
+        if (reason.message.includes('Forbidden') || reason.message.includes('Gateway Timeout')) {
+          process.exit(0)
+        } else {
+          process.exit(1)
+        }
       })
 
       try {
@@ -936,14 +941,17 @@ export default class MonkeyActuator {
           throw new Error('config mode is undefined')
         }
 
+        const expectedSingleStepTime = 30;
+        const tolerantSingleStepTime = 30;
+
         dealInfo.signData = (await business.signQuote(
           this.config.network!,
           dealInfo.quote,
           dealInfo.amount,
           0,
           receivingAddress,
-          undefined,
-          undefined,
+          expectedSingleStepTime,
+          tolerantSingleStepTime,
           undefined,
           dealInfo.srcRpc,
           dealInfo.dstRpc,
