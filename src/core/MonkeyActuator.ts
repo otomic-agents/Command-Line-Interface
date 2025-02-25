@@ -941,8 +941,8 @@ export default class MonkeyActuator {
           throw new Error('config mode is undefined')
         }
 
-        const expectedSingleStepTime = 30;
-        const tolerantSingleStepTime = 30;
+        const expectedSingleStepTime = 30
+        const tolerantSingleStepTime = 30
 
         dealInfo.signData = (await business.signQuote(
           this.config.network!,
@@ -1509,18 +1509,17 @@ export default class MonkeyActuator {
             })
             task.output = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
             task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
+          } else if (
+            utils.GetChainType(dealInfo.preBusiness!.swap_asset_information.quote.quote_base.bridge.src_chain_id) ==
+            'solana'
+          ) {
+            const resp = await business.initSwap(dealInfo.preBusiness!, this.config.network!, dealInfo.srcRpc, {
+              type: 'privateKey',
+              privateKey: this.config.solanaPrivateKey,
+            })
+            task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
+            task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
           }
-          // else if (
-          //   utils.GetChainType(dealInfo.preBusiness!.swap_asset_information.quote.quote_base.bridge.src_chain_id) ==
-          //   'solana'
-          // ) {
-          //   const resp = await business.transferOut(dealInfo.preBusiness!, this.config.network!, dealInfo.srcRpc, {
-          //     type: 'privateKey',
-          //     privateKey: this.config.solanaPrivateKey,
-          //   })
-          //   task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
-          //   task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
-          // }
         },
         {
           retries: 5,
@@ -1613,23 +1612,17 @@ export default class MonkeyActuator {
             })
             task.output = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
             task.title = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
+          } else if (
+            utils.GetChainType(dealInfo.preBusiness!.swap_asset_information.quote.quote_base.bridge.src_chain_id) ==
+            'solana'
+          ) {
+            const resp = await business.refundSwap(dealInfo.preBusiness!, this.config.network!, dealInfo.srcRpc, {
+              type: 'privateKey',
+              privateKey: this.config.solanaPrivateKey,
+            })
+            task.output = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
+            task.title = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
           }
-          // else if (
-          //   utils.GetChainType(dealInfo.preBusiness!.swap_asset_information.quote.quote_base.bridge.src_chain_id) ==
-          //   'solana'
-          // ) {
-          //   const resp = await business.transferOutRefund(
-          //     dealInfo.preBusiness!,
-          //     this.config.network!,
-          //     dealInfo.srcRpc,
-          //     {
-          //       type: 'privateKey',
-          //       privateKey: this.config.solanaPrivateKey,
-          //     },
-          //   )
-          //   task.output = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
-          //   task.title = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
-          // }
         },
         {
           retries: 5,
