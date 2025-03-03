@@ -330,6 +330,7 @@ export default class SwapActuator {
                 type: 'privateKey',
                 privateKey: this.privateKeyForSend,
                 useMaximumGasPriceAtMost: this.useMaximumGasPriceAtMost,
+                swapType: SwapType.ATOMIC
               })
               if (
                 utils.GetChainType(preBusiness.swap_asset_information.quote.quote_base.bridge.src_chain_id) == 'evm'

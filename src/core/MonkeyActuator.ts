@@ -709,7 +709,7 @@ export default class MonkeyActuator {
 
   callWebHookSucceed = (task: any, relay: Otmoic.Relay, dealInfo: DealInfo, note?: string) =>
     new Promise<void>(async (resolve, reject) => {
-      if (this.config.webhook != undefined) {
+      if (!this.config.webhook) {
         let swapInfo = dealInfo.preBusiness?.swap_asset_information
         let {['append_information']: appendInfo, ...rest1} = swapInfo!
         let {['quote']: quote, ...rest2} = rest1!
@@ -736,7 +736,7 @@ export default class MonkeyActuator {
 
   callWebHookFailed = (task: any, relay: Otmoic.Relay, dealInfo: DealInfo) =>
     new Promise<void>(async (resolve, reject) => {
-      if (this.config.webhook != undefined) {
+      if (!this.config.webhook) {
         if (!dealInfo.preBusiness) {
           let bridgeInfo = dealInfo.bridge
             ? `${dealInfo.bridge.src_chain_id}-${dealInfo.bridge.src_token}--->${dealInfo.bridge.dst_chain_id}-${dealInfo.bridge.dst_token}`
@@ -1026,6 +1026,7 @@ export default class MonkeyActuator {
               type: 'privateKey',
               privateKey: this.config.privateKey,
               useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
+              swapType: SwapType.ATOMIC
             })
             task.output = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
             task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
@@ -1036,6 +1037,7 @@ export default class MonkeyActuator {
             const resp = await business.transferOut(dealInfo.preBusiness!, this.config.network!, dealInfo.srcRpc, {
               type: 'privateKey',
               privateKey: this.config.solanaPrivateKey,
+              swapType: SwapType.ATOMIC
             })
             task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
             task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
@@ -1225,6 +1227,7 @@ export default class MonkeyActuator {
                   type: 'privateKey',
                   privateKey: this.config.privateKey,
                   useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
+                  swapType: SwapType.ATOMIC
                 },
               )
               task.title = `${task.title} -- user cheat confirm in -- ${(resp as ethers.ContractTransactionResponse).hash}`
@@ -1240,6 +1243,7 @@ export default class MonkeyActuator {
                 {
                   type: 'privateKey',
                   privateKey: this.config.solanaPrivateKey,
+                  swapType: SwapType.ATOMIC
                 },
               )
               task.title = `${task.title} -- user cheat confirm in -- ${(resp as ResponseSolana).txHash}`
@@ -1378,6 +1382,7 @@ export default class MonkeyActuator {
                 type: 'privateKey',
                 privateKey: this.config.privateKey,
                 useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
+                swapType: SwapType.ATOMIC
               },
             )
             task.output = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
@@ -1393,6 +1398,7 @@ export default class MonkeyActuator {
               {
                 type: 'privateKey',
                 privateKey: this.config.solanaPrivateKey,
+                swapType: SwapType.ATOMIC
               },
             )
             task.output = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
@@ -1502,10 +1508,11 @@ export default class MonkeyActuator {
             utils.GetChainType(dealInfo.preBusiness!.swap_asset_information.quote.quote_base.bridge.src_chain_id) ==
             'evm'
           ) {
-            const resp = await business.initSwap(dealInfo.preBusiness!, this.config.network!, dealInfo.srcRpc, {
+            const resp = await business.transferOut(dealInfo.preBusiness!, this.config.network!, dealInfo.srcRpc, {
               type: 'privateKey',
               privateKey: this.config.privateKey,
               useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
+              swapType: SwapType.SINGLECHAIN
             })
             task.output = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
             task.title = `${task.title} -- ${(resp as ResponseTransferOut).transferOut.hash}`
@@ -1513,9 +1520,10 @@ export default class MonkeyActuator {
             utils.GetChainType(dealInfo.preBusiness!.swap_asset_information.quote.quote_base.bridge.src_chain_id) ==
             'solana'
           ) {
-            const resp = await business.initSwap(dealInfo.preBusiness!, this.config.network!, dealInfo.srcRpc, {
+            const resp = await business.transferOut(dealInfo.preBusiness!, this.config.network!, dealInfo.srcRpc, {
               type: 'privateKey',
               privateKey: this.config.solanaPrivateKey,
+              swapType: SwapType.SINGLECHAIN
             })
             task.output = `${task.title} -- ${(resp as ResponseSolana).txHash}`
             task.title = `${task.title} -- ${(resp as ResponseSolana).txHash}`
@@ -1605,10 +1613,11 @@ export default class MonkeyActuator {
             utils.GetChainType(dealInfo.preBusiness!.swap_asset_information.quote.quote_base.bridge.src_chain_id) ==
             'evm'
           ) {
-            const resp = await business.refundSwap(dealInfo.preBusiness!, this.config.network!, dealInfo.srcRpc, {
+            const resp = await business.transferOutRefund(dealInfo.preBusiness!, this.config.network!, dealInfo.srcRpc, {
               type: 'privateKey',
               privateKey: this.config.privateKey,
               useMaximumGasPriceAtMost: this.config.useMaximumGasPriceAtMost,
+              swapType: SwapType.SINGLECHAIN
             })
             task.output = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
             task.title = `${task.title} -- refund out: ${(resp as ethers.ContractTransactionResponse).hash}`
@@ -1616,9 +1625,10 @@ export default class MonkeyActuator {
             utils.GetChainType(dealInfo.preBusiness!.swap_asset_information.quote.quote_base.bridge.src_chain_id) ==
             'solana'
           ) {
-            const resp = await business.refundSwap(dealInfo.preBusiness!, this.config.network!, dealInfo.srcRpc, {
+            const resp = await business.transferOutRefund(dealInfo.preBusiness!, this.config.network!, dealInfo.srcRpc, {
               type: 'privateKey',
               privateKey: this.config.solanaPrivateKey,
+              swapType: SwapType.SINGLECHAIN
             })
             task.output = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
             task.title = `${task.title} -- refund out: ${(resp as ResponseSolana).txHash}`
