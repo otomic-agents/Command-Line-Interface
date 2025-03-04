@@ -709,7 +709,7 @@ export default class MonkeyActuator {
 
   callWebHookSucceed = (task: any, relay: Otmoic.Relay, dealInfo: DealInfo, note?: string) =>
     new Promise<void>(async (resolve, reject) => {
-      if (!this.config.webhook) {
+      if (this.config.webhook) {
         let swapInfo = dealInfo.preBusiness?.swap_asset_information
         let {['append_information']: appendInfo, ...rest1} = swapInfo!
         let {['quote']: quote, ...rest2} = rest1!
@@ -736,7 +736,7 @@ export default class MonkeyActuator {
 
   callWebHookFailed = (task: any, relay: Otmoic.Relay, dealInfo: DealInfo) =>
     new Promise<void>(async (resolve, reject) => {
-      if (!this.config.webhook) {
+      if (this.config.webhook) {
         if (!dealInfo.preBusiness) {
           let bridgeInfo = dealInfo.bridge
             ? `${dealInfo.bridge.src_chain_id}-${dealInfo.bridge.src_token}--->${dealInfo.bridge.dst_chain_id}-${dealInfo.bridge.dst_token}`
