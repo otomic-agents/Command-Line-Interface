@@ -391,7 +391,7 @@ export default class MonkeyActuator {
                   if (this.config.mode == SwapType.ATOMIC) {
                     if (dealInfo.step == Step.UserTransferOut) {
                       if (dealInfo.type == 'cheat amount' || dealInfo.type == 'cheat address') {
-                        await this.taskExchangeTxOutRefund(task, dealInfo)
+                        await this.taskExchangeTxOutRefund(task, relay, dealInfo)
                         await this.callWebHookSucceed(task, relay, dealInfo)
                       } else {
                         task.output = `transfer out is failed to on chain`
@@ -400,20 +400,20 @@ export default class MonkeyActuator {
                     }
 
                     if (dealInfo.step == Step.LpTransferIn) {
-                      await this.taskExchangeTxOutRefund(task, dealInfo)
+                      await this.taskExchangeTxOutRefund(task, relay, dealInfo)
                       task.output = 'cannot get lp tx in, going to refund tx out'
                       await this.callWebHookFailed(task, relay, dealInfo)
                     }
 
                     if (dealInfo.step == Step.UserConfirmOut) {
-                      await this.taskExchangeTxOutRefund(task, dealInfo)
+                      await this.taskExchangeTxOutRefund(task, relay, dealInfo)
                       task.output = 'confirm out is failed on chain, going to refund tx out'
                       await this.callWebHookFailed(task, relay, dealInfo)
                     }
 
                     if (dealInfo.step == Step.LpConfirmIn) {
                       if (dealInfo.type == 'cheat txin') {
-                        await this.taskExchangeTxOutRefund(task, dealInfo)
+                        await this.taskExchangeTxOutRefund(task, relay, dealInfo)
                         task.output =
                           'relay tx out confirm - cannot get transfer out confirm event from relay at task timeout -- going to refund tx out'
                         await this.callWebHookFailed(task, relay, dealInfo)
@@ -606,7 +606,7 @@ export default class MonkeyActuator {
                                     dealInfo.type == 'cheat amount'
                                   ) {
                                     let finished = false
-                                    this.taskExchangeTxOutRefund(task, dealInfo).then(() => (finished = true))
+                                    this.taskExchangeTxOutRefund(task, relay, dealInfo).then(() => (finished = true))
 
                                     while (finished == false) {
                                       await delay(100)
@@ -1054,7 +1054,7 @@ export default class MonkeyActuator {
         await delay(2000)
         const resp = await getBusinessRetry(relay, dealInfo.preBusiness!.hash)
         task.output = `waiting... step: ${resp.step}`
-        succeed = resp.step == Step.UserTransferOut
+        succeed = resp.transfer_out_id > 0
 
         if (succeed) {
           task.output = `transfer out is on chain successfully`
@@ -1081,7 +1081,7 @@ export default class MonkeyActuator {
         await delay(2000)
         const resp = await getBusinessRetry(relay, dealInfo.preBusiness!.hash)
         task.output = `waiting... step: ${resp.step}`
-        succeed = resp.step == Step.LpTransferIn
+        succeed = resp.transfer_in_id > 0
 
         if (succeed) {
           //get business data and show txhash
@@ -1157,7 +1157,7 @@ export default class MonkeyActuator {
           await delay(2000)
           const resp = await getBusinessRetry(relay, dealInfo.preBusiness!.hash)
           task.output = `waiting... step: ${resp.step}`
-          succeed = resp.step == Step.UserConfirmOut
+          succeed = resp.transfer_out_confirm_id > 0
 
           if (succeed) {
             task.output = `confirm out is on chain successfully`
@@ -1291,7 +1291,7 @@ export default class MonkeyActuator {
         await delay(2000)
         const resp = await getBusinessRetry(relay, dealInfo.preBusiness!.hash)
         task.output = `waiting... step: ${resp.step}`
-        succeed = resp.step >= Step.LpConfirmIn
+        succeed = resp.transfer_in_confirm_id > 0
 
         if (succeed) {
           //get business data and show txhash
@@ -1348,7 +1348,7 @@ export default class MonkeyActuator {
       resolve()
     })
 
-  taskExchangeTxOutRefund = (task: any, dealInfo: DealInfo) =>
+  taskExchangeTxOutRefund = (task: any, relay: Otmoic.Relay, dealInfo: DealInfo) =>
     new Promise<void>(async (resolve, reject) => {
       task.output = 'checking...'
 
@@ -1410,8 +1410,17 @@ export default class MonkeyActuator {
         },
       )
 
-      // wait for the transaction be minted
-      await delay(1000 * 3)
+      let succeed = false
+      while (succeed == false) {
+        await delay(2000)
+        const resp = await getBusinessRetry(relay, dealInfo.preBusiness!.hash)
+        task.output = `waiting... step: ${resp.step}`
+        succeed = resp.transfer_out_refund_id > 0
+
+        if (succeed) {
+          task.output = `transfer out refund is on chain successfully`
+        }
+      }
 
       resolve()
     })
@@ -1435,7 +1444,7 @@ export default class MonkeyActuator {
 
         const resp = await getBusinessRetry(relay, dealInfo.preBusiness!.hash)
         task.output = `waiting... step: ${resp.step}`
-        succeed = resp.step >= Step.LpRefundIn
+        succeed = resp.transfer_in_refund_id > 0
 
         if (succeed) {
           //get business data and show txhash
