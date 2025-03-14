@@ -2043,26 +2043,36 @@ export default class MonkeyActuator {
       } else if (utils.GetChainType(bridge.src_chain_id) == 'solana') {
         address = this.config.solanaSendingAddress
       }
-      const balance = await utils.GetBalance(
-        bridge,
-        address,
-        this.config.network!,
-        this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()],
+      await retry(
+        async () => {
+          const balance = await utils.GetBalance(
+            bridge,
+            address,
+            this.config.network!,
+            this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()],
+          )
+          console.log(`${address} balance on token ${bridge.src_token} is : ${balance}`)
+          if (isZeroAddress(bridge.src_token)) {
+            if (parseFloat(balance) > 0.004) {
+              resolve(true)
+            } else {
+              resolve(false)
+            }
+          } else {
+            if (parseFloat(balance) > 0.0001) {
+              resolve(true)
+            } else {
+              resolve(false)
+            }
+          }
+        },
+        {
+          retries: 5,
+          onRetry: (error, attempt) => {
+            console.log(`retry ${attempt} -- get error -- ${error}`)
+          },
+        },
       )
-      console.log(`${address} balance on token ${bridge.src_token} is : ${balance}`)
-      if (isZeroAddress(bridge.src_token)) {
-        if (parseFloat(balance) > 0.004) {
-          resolve(true)
-        } else {
-          resolve(false)
-        }
-      } else {
-        if (parseFloat(balance) > 0.0001) {
-          resolve(true)
-        } else {
-          resolve(false)
-        }
-      }
     })
 
   getBalance = (bridge: Bridge) =>
