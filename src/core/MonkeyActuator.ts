@@ -880,6 +880,9 @@ export default class MonkeyActuator {
         {
           OnQuote: (quote: Quote) => {
             console.log('get new quote', quote)
+            if (quote.quote_base.error_code != 0) {
+              throw new Error(`get quote failed: ${quote.quote_base.error_message}`)
+            }
             console.log(`got quote already? ${gotQuote ? 'yes, then skip it' : 'no, then take the quote'}`)
             if (!gotQuote) {
               if (this.config.lp == undefined || this.config.lp == '') {
