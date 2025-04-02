@@ -950,8 +950,8 @@ export default class MonkeyActuator {
           dealInfo.amount,
           0,
           receivingAddress,
-          undefined,
-          undefined,
+          90,
+          90,
           undefined,
           dealInfo.srcRpc,
           dealInfo.dstRpc,
@@ -1474,6 +1474,9 @@ export default class MonkeyActuator {
         throw new Error('preBusiness is undefined')
       }
 
+      console.log(JSON.stringify(dealInfo.preBusiness, null, 2))
+      console.log(this.config.privateKey)
+      console.log(this.config.network)
       const resp = await business.complain(dealInfo.preBusiness, this.config.privateKey, this.config.network!)
       if (resp === true) {
         task.output = `${task.title} -- complaint -- submitted successfully`
