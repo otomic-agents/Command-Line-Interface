@@ -811,9 +811,9 @@ export default class MonkeyActuator {
 
       const enoughList: Bridge[] = []
 
-      let maxBalance = 0;
+      let maxBalance = 0
       for (const b of bridgeList) {
-        let bal = await this.isBalanceEnough(b);
+        let bal = await this.isBalanceEnough(b)
         if (bal > maxBalance) {
           enoughList.push(b)
           maxBalance = bal
@@ -1558,7 +1558,7 @@ export default class MonkeyActuator {
         await delay(2000)
         const resp = await getBusinessRetry(relay, dealInfo.preBusiness!.hash)
         task.output = `waiting... single swap step: ${resp.single_swap_step}`
-        succeed = resp.single_swap_step == SingleSwapStep.SwapInited
+        succeed = resp.init_swap_id > 0
 
         if (succeed) {
           task.output = `init swap is on chain successfully`
@@ -1585,7 +1585,7 @@ export default class MonkeyActuator {
         await delay(2000)
         const resp = await getBusinessRetry(relay, dealInfo.preBusiness!.hash)
         task.output = `waiting... single swap step: ${resp.single_swap_step}`
-        succeed = resp.single_swap_step == SingleSwapStep.SwapConfirmed
+        succeed = resp.confirm_swap_id > 0
 
         if (succeed) {
           //get business data and show txhash
