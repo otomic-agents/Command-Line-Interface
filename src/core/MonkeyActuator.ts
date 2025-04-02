@@ -811,9 +811,12 @@ export default class MonkeyActuator {
 
       const enoughList: Bridge[] = []
 
+      let maxBalance = 0;
       for (const b of bridgeList) {
-        if (await this.isBalanceEnough(b)) {
+        let bal = await this.isBalanceEnough(b);
+        if (bal > maxBalance) {
           enoughList.push(b)
+          maxBalance = bal
         }
       }
 
@@ -823,7 +826,7 @@ export default class MonkeyActuator {
         throw new Error('monkey has no balance on bridges')
       }
 
-      dealInfo.bridge = enoughList[getRandomNumberInRange(0, enoughList.length - 1)]
+      dealInfo.bridge = enoughList[enoughList.length - 1]
 
       task.title = `${task.title} --- (${dealInfo.bridge.src_chain_id}-${dealInfo.bridge.src_token}--->${dealInfo.bridge.dst_chain_id}-${dealInfo.bridge.dst_token})`
 
@@ -2042,7 +2045,7 @@ export default class MonkeyActuator {
     })
 
   isBalanceEnough = (bridge: Bridge) =>
-    new Promise<boolean>(async (resolve, reject) => {
+    new Promise<number>(async (resolve, reject) => {
       let address = ''
       if (utils.GetChainType(bridge.src_chain_id) == 'evm') {
         address = this.config.sendingAddress
@@ -2058,19 +2061,7 @@ export default class MonkeyActuator {
             this.config.rpcs[utils.GetChainName(bridge.src_chain_id).toLowerCase()],
           )
           console.log(`${address} balance on token ${bridge.src_token} is : ${balance}`)
-          if (isZeroAddress(bridge.src_token)) {
-            if (parseFloat(balance) > 0.004) {
-              resolve(true)
-            } else {
-              resolve(false)
-            }
-          } else {
-            if (parseFloat(balance) > 0.0001) {
-              resolve(true)
-            } else {
-              resolve(false)
-            }
-          }
+          resolve(parseFloat(balance))
         },
         {
           retries: 5,
