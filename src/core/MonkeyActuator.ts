@@ -400,22 +400,21 @@ export default class MonkeyActuator {
                     }
 
                     if (dealInfo.step == Step.LpTransferIn) {
-                      await this.taskExchangeTxOutRefund(task, relay, dealInfo)
                       task.output = 'cannot get lp tx in, going to refund tx out'
+                      await this.taskExchangeTxOutRefund(task, relay, dealInfo)
                       await this.callWebHookFailed(task, relay, dealInfo)
                     }
 
                     if (dealInfo.step == Step.UserConfirmOut) {
-                      await this.taskExchangeTxOutRefund(task, relay, dealInfo)
                       task.output = 'confirm out is failed on chain, going to refund tx out'
+                      await this.taskExchangeTxOutRefund(task, relay, dealInfo)
                       await this.callWebHookFailed(task, relay, dealInfo)
                     }
 
                     if (dealInfo.step == Step.LpConfirmIn) {
                       if (dealInfo.type == 'cheat txin') {
+                        task.output = 'relay tx out confirm - cannot get transfer out confirm event from relay at task timeout -- going to refund tx out'
                         await this.taskExchangeTxOutRefund(task, relay, dealInfo)
-                        task.output =
-                          'relay tx out confirm - cannot get transfer out confirm event from relay at task timeout -- going to refund tx out'
                         await this.callWebHookFailed(task, relay, dealInfo)
                       } else {
                         task.output = 'cannot get transfer in confirm event from lp at task timeout -- something wrong'
@@ -730,8 +729,9 @@ export default class MonkeyActuator {
           note: note || '',
         })
 
-        resolve()
       }
+      
+      resolve()
     })
 
   callWebHookFailed = (task: any, relay: Otmoic.Relay, dealInfo: DealInfo) =>
@@ -782,8 +782,9 @@ export default class MonkeyActuator {
           socketId: dealInfo.socketId,
         })
 
-        resolve()
       }
+
+      resolve()
     })
 
   taskRandomBridge = (task: any, relay: Otmoic.Relay, dealInfo: DealInfo) =>
